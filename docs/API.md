@@ -108,17 +108,10 @@ Enum inputs are case-insensitive (`"hybrid"` is accepted), and responses are alw
 
 ### POST `/api/auth/register`
 
-Self sign-up. The role is decided by the server from the email address:
+Self sign-up. **Always creates a `PARTICIPANT`**; any `role` field in the request is ignored.
 
-| Email                          | Role assigned |
-| ------------------------------ | ------------- |
-| ends with `@cict.in` (institute) | `ORGANIZER`   |
-| anything else                  | `PARTICIPANT` |
-
-The match is exact and case-insensitive: `@notcict.in` and `@sub.cict.in` do **not** count. There is no
-`role` field in the request; if one is sent, it is ignored. Read `data.user.role` from the response to
-decide which dashboard to open. Admins are only created by an admin ([POST /api/admin/users](#post-apiadminusers)),
-and an admin can change anyone's role afterwards.
+Organizers are created by an admin, either directly ([POST /api/admin/users](#post-apiadminusers)) or by approving an
+[organizer request](#post-apiauthorganizer-requests).
 
 **Access:** Public
 
@@ -134,7 +127,7 @@ Request:
 | `email`    | required, valid email (stored lowercase) |
 | `password` | required, 8–72 chars               |
 
-Response `201` (for a non-institute email):
+Response `201`:
 
 ```json
 {
@@ -154,17 +147,76 @@ Errors:
 
 - `400` validation.
 - `403` `"This email can't be used to create an account. Please contact the CICT admin."`: the email belongs to a suspended account, or to a suspended account that an admin deleted. Only an admin can create an account with it.
-- `409` email already registered.
+- `409` email already registered, or an organizer request for this email is still waiting for approval.
+
+### POST `/api/auth/organizer-requests`
+
+Ask an admin for an organizer account (the "Request organizer access" page).
+
+**Access:** Public
+
+Request:
+
+```json
+{
+  "name": "Deepa Raman",
+  "email": "deepa@college.edu",
+  "password": "Organizer@123",
+  "designation": "Lab In-charge, CICT",
+  "reason": "To run the IoT hands-on workshop series."
+}
+```
+
+| Field         | Rules                     |
+| ------------- | ------------------------- |
+| `name`        | required, 2–120 chars     |
+| `email`       | required, valid email     |
+| `password`    | required, 8–72 chars. Stored only as a bcrypt hash; it becomes the organizer's password on approval |
+| `designation` | required, 2–120 chars     |
+| `reason`      | required, 10–1000 chars   |
+
+Response `201` (message `"Request sent. You can sign in once an admin approves it."`):
+
+```json
+{ "id": 3, "name": "Deepa Raman", "email": "deepa@college.edu", "designation": "Lab In-charge, CICT",
+  "reason": "To run the IoT hands-on workshop series.", "status": "PENDING", "createdAt": "2026-09-24T07:25:00.000Z" }
+```
+
+Until the request is approved, signing in with these details returns a `403` explaining that it is pending (see [login](#post-apiauthlogin)).
+
+Errors:
+
+- `400` validation.
+- `403` the email is blocked (see [DELETE /api/admin/users/:id](#delete-apiadminusersid)).
+- `409` the email already has an account, or already has a pending request.
+
+A rejected applicant can send a new request.
 
 ### POST `/api/auth/login`
 
 **Access:** Public
 
-Request: `{ "email": "meera@aurex26.dev", "password": "Password@123" }`
+Request: `{ "email": "meera@aurex26.dev", "password": "Password@123", "portal": "ORGANIZER" }`
+
+`portal` (optional) says which sign-in tab is being used:
+
+- `"PARTICIPANT"` accepts participant accounts only.
+- `"ORGANIZER"` accepts organizer and admin accounts only.
+- Omitted: any role is accepted.
+
+The web app always sends it. On a mismatch, no token is issued.
 
 Response `200`: same `data` shape as register (`{ token, user }`), with message `"Login successful"`.
 
-Errors: `400` validation · `401` `"Invalid email or password"` · `403` `"Your account has been suspended. Please contact the CICT admin."` (only shown after a correct password)
+Errors:
+
+- `400` validation.
+- `401` `"Invalid email or password"`.
+- `403`, only after a correct password:
+  - `"Your account has been suspended. Please contact the CICT admin."`
+  - `"Your organizer request is waiting for admin approval. You can sign in once it is approved."`
+  - `"Your organizer request was not approved. Please contact the CICT admin."`
+  - `"This is an organizer account. Please use the Organizer sign-in."` (or `"…an admin account…"`, or `"This is a participant account. Please use the Participant sign-in."`) when `portal` does not match the account.
 
 ### GET `/api/auth/me`
 
@@ -1007,7 +1059,8 @@ Response `200`:
   "totals": {
     "users": 9, "admins": 1, "organizers": 2, "participants": 6,
     "workshops": 4, "draftWorkshops": 1, "publishedWorkshops": 2, "closedWorkshops": 1,
-    "registrations": 10, "sessions": 16, "attendanceMarked": 31, "certificates": 2
+    "registrations": 10, "sessions": 16, "attendanceMarked": 31, "certificates": 2,
+    "pendingOrganizerRequests": 1
   },
   "workshops": [
     {
@@ -1023,6 +1076,37 @@ Response `200`:
 - `registrations` counts active (`REGISTERED`) registrations.
 - `attendanceMarked` counts `PRESENT` records.
 - `averageAttendance` is `presentCount / (registeredCount × completedSessionCount) × 100`, over completed sessions only; `presentCount` also only counts completed sessions.
+
+### GET `/api/admin/organizer-requests`
+
+Query (optional): `?status=PENDING` | `APPROVED` | `REJECTED`. Without a status, all requests are returned, pending first.
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 3, "name": "Deepa Raman", "email": "deepa@college.edu", "designation": "Lab In-charge, CICT",
+    "reason": "To run the IoT hands-on workshop series.", "status": "PENDING",
+    "reviewedBy": null, "reviewedByName": null, "reviewedAt": null, "createdAt": "2026-09-24T07:25:00.000Z"
+  }
+]
+```
+
+### POST `/api/admin/organizer-requests/:id/approve`
+
+Creates the `ORGANIZER` account, using the password the applicant chose, and marks the request `APPROVED`. The
+password hash is then removed from the request. It also lifts a block on the email, if there is one.
+
+Response `200` (message `"<name> is now an organizer and can sign in."`): `{ "request": { …, "status": "APPROVED" }, "user": { …, "role": "ORGANIZER" } }`
+
+Errors: `404` · `409` already approved or rejected, or the email now has an account
+
+### POST `/api/admin/organizer-requests/:id/reject`
+
+Response `200` (message `"Request rejected"`): the request with `"status": "REJECTED"`.
+
+Errors: `404` · `409` already approved or rejected
 
 ### GET `/api/admin/users`
 
@@ -1149,6 +1233,7 @@ Phones can't open `localhost`. Set `FRONTEND_URL` in `server/.env` to the laptop
 | POST   | `/api/auth/register`                         | Public      |
 | POST   | `/api/auth/login`                            | Public      |
 | GET    | `/api/auth/me`                               | Auth        |
+| POST   | `/api/auth/organizer-requests`               | Public      |
 | GET    | `/api/workshops`                             | Optional    |
 | POST   | `/api/workshops`                             | Manager     |
 | GET    | `/api/workshops/:id`                         | Optional    |
@@ -1186,3 +1271,6 @@ Phones can't open `localhost`. Set `FRONTEND_URL` in `server/.env` to the laptop
 | PATCH  | `/api/admin/users/:id/suspend`               | Admin       |
 | PATCH  | `/api/admin/users/:id/reactivate`            | Admin       |
 | DELETE | `/api/admin/users/:id`                       | Admin       |
+| GET    | `/api/admin/organizer-requests`              | Admin       |
+| POST   | `/api/admin/organizer-requests/:id/approve`  | Admin       |
+| POST   | `/api/admin/organizer-requests/:id/reject`   | Admin       |

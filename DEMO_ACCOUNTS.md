@@ -36,6 +36,6 @@ These accounts come from `database/seed.sql`. They are available after running `
 3. **Certificates:** sign in as `meera@aurex26.dev`. Open Full-Stack, go to **Attendance & certificates**, then **Generate certificates** (2 issued, 2 not eligible).
 4. **Certificate holder:** sign in as `priya@aurex26.dev`. Go to **Certificates**, then download the PDF, and scan its QR code to verify.
 
-New sign-ups with an `@cict.in` email automatically become organizers.
+New sign-ups are always participants. To become an organizer, use **Sign in → Organizer tab → Request organizer access**. An admin approves the request under **Organizers**.
 
 > These are demo credentials for the hackathon only. Reset or remove them before any real use.

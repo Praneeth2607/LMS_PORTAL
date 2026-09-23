@@ -7,7 +7,7 @@ import RequireAuth from './components/RequireAuth.jsx';
 import LandingPage from './pages/public/LandingPage.jsx';
 import WorkshopsPage from './pages/public/WorkshopsPage.jsx';
 import WorkshopDetailPage from './pages/public/WorkshopDetailPage.jsx';
-import { LoginPage, RegisterPage } from './pages/public/AuthPages.jsx';
+import { LoginPage, OrganizerRequestPage, RegisterPage } from './pages/public/AuthPages.jsx';
 import VerifyPage from './pages/public/VerifyPage.jsx';
 import AttendancePage from './pages/public/AttendancePage.jsx';
 import CertificatePage from './pages/public/CertificatePage.jsx';
@@ -62,6 +62,7 @@ export default function App() {
           <Route path="workshops/:id" element={<WorkshopDetailPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="request-organizer-access" element={<OrganizerRequestPage />} />
           <Route path="verify" element={<VerifyPage />} />
           <Route path="verify/:certificateId" element={<VerifyPage />} />
           {/* Opened from the session QR code; handles sign-in itself so the token survives. */}

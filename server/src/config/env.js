@@ -35,8 +35,6 @@ const env = {
   appTimezone: process.env.APP_TIMEZONE || 'Asia/Kolkata',
 
   bcryptSaltRounds: toInt(process.env.BCRYPT_SALT_ROUNDS, 10),
-  // Self sign-ups with an email at this domain become ORGANIZERs.
-  organizerEmailDomain: (process.env.ORGANIZER_EMAIL_DOMAIN || 'cict.in').trim().toLowerCase().replace(/^@/, ''),
   attendanceWindowMinutes: toInt(process.env.ATTENDANCE_WINDOW_MINUTES, 15),
   // Attendance can be started from a session's start time until this many
   // minutes after it ends.

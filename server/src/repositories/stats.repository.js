@@ -17,7 +17,8 @@ export async function portalTotals() {
       (SELECT COUNT(*) FROM registrations WHERE status = 'REGISTERED') AS registrations,
       (SELECT COUNT(*) FROM sessions)                                 AS sessions,
       (SELECT COUNT(*) FROM attendance WHERE status = 'PRESENT')      AS attendance_marked,
-      (SELECT COUNT(*) FROM certificates)                             AS certificates
+      (SELECT COUNT(*) FROM certificates)                             AS certificates,
+      (SELECT COUNT(*) FROM organizer_requests WHERE status = 'PENDING') AS pending_organizer_requests
   `);
   return rows[0];
 }

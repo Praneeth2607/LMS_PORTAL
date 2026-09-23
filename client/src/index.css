@@ -30,6 +30,8 @@
     background: var(--color-canvas);
     color: var(--color-ink);
     -webkit-text-size-adjust: 100%;
+    /* Keep focused / scrolled-to elements clear of the sticky floating nav. */
+    scroll-padding-top: 120px;
   }
   body {
     font-family: var(--font-sans);
