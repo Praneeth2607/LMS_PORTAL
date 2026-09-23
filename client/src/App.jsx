@@ -1,52 +1,116 @@
-import { useEffect, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { checkHealth } from './services/api.js';
+import { useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import AppLayout from './layouts/AppLayout.jsx';
+import ManageWorkshopLayout from './layouts/ManageWorkshopLayout.jsx';
+import RequireAuth from './components/RequireAuth.jsx';
 
-function Home() {
-  const [status, setStatus] = useState({ state: 'loading', message: 'Checking API…' });
+import LandingPage from './pages/public/LandingPage.jsx';
+import WorkshopsPage from './pages/public/WorkshopsPage.jsx';
+import WorkshopDetailPage from './pages/public/WorkshopDetailPage.jsx';
+import { LoginPage, RegisterPage } from './pages/public/AuthPages.jsx';
+import VerifyPage from './pages/public/VerifyPage.jsx';
+import AttendancePage from './pages/public/AttendancePage.jsx';
+import CertificatePage from './pages/public/CertificatePage.jsx';
+import NotFoundPage from './pages/public/NotFoundPage.jsx';
 
+import {
+  MyCertificatesPage,
+  MyWorkshopDetailPage,
+  MyWorkshopsPage,
+  ParticipantDashboard,
+  ProfilePage,
+} from './pages/participant/ParticipantPages.jsx';
+
+import {
+  AnnouncementsPage,
+  CreateWorkshopPage,
+  EditWorkshopPage,
+  OrganizerDashboard,
+  OrganizerWorkshopsPage,
+  ParticipantsPage,
+  WorkshopOverviewPage,
+} from './pages/organizer/OrganizerPages.jsx';
+import SessionsPage from './pages/organizer/SessionsPage.jsx';
+import AttendanceOverviewPage from './pages/organizer/AttendanceOverviewPage.jsx';
+
+import {
+  AdminCertificatesPage,
+  AdminDashboard,
+  AdminOrganizersPage,
+  AdminParticipantsPage,
+  AdminWorkshopsPage,
+} from './pages/admin/AdminPages.jsx';
+
+// Scroll to top on navigation (but not when only the query string changes).
+function ScrollToTop() {
+  const { pathname } = useLocation();
   useEffect(() => {
-    checkHealth()
-      .then((res) => setStatus({ state: 'ok', message: res.message }))
-      .catch((err) => setStatus({ state: 'error', message: err.message || 'API unreachable' }));
-  }, []);
-
-  const badge = {
-    loading: 'bg-slate-100 text-slate-600',
-    ok: 'bg-emerald-100 text-emerald-700',
-    error: 'bg-rose-100 text-rose-700',
-  }[status.state];
-
-  return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="max-w-lg w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-        <p className="text-sm font-medium text-indigo-600">Aurex&apos;26 · Tech Comrades</p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900">CICT Workshop Management Portal</h1>
-        <p className="mt-2 text-slate-600">
-          Workshops, registrations, attendance and certificates, all in one place.
-        </p>
-        <div className={`mt-6 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ${badge}`}>
-          <span className="h-2 w-2 rounded-full bg-current" />
-          {status.message}
-        </div>
-      </div>
-    </main>
-  );
-}
-
-function NotFound() {
-  return (
-    <main className="min-h-screen flex items-center justify-center text-slate-600">
-      Page not found
-    </main>
-  );
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
 }
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route element={<AppLayout />}>
+          {/* Public */}
+          <Route index element={<LandingPage />} />
+          <Route path="workshops" element={<WorkshopsPage />} />
+          <Route path="workshops/:id" element={<WorkshopDetailPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="verify" element={<VerifyPage />} />
+          <Route path="verify/:certificateId" element={<VerifyPage />} />
+          {/* Opened from the session QR code; handles sign-in itself so the token survives. */}
+          <Route path="attendance/:sessionId" element={<AttendancePage />} />
+
+          {/* Any signed-in user (backend checks ownership) */}
+          <Route element={<RequireAuth />}>
+            <Route path="certificates/:id" element={<CertificatePage />} />
+          </Route>
+
+          {/* Participant */}
+          <Route path="participant" element={<RequireAuth roles={['PARTICIPANT']} />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<ParticipantDashboard />} />
+            <Route path="workshops" element={<MyWorkshopsPage />} />
+            <Route path="workshops/:id" element={<MyWorkshopDetailPage />} />
+            <Route path="certificates" element={<MyCertificatesPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+          </Route>
+
+          {/* Organizer (admins can manage every workshop too) */}
+          <Route path="organizer" element={<RequireAuth roles={['ORGANIZER', 'ADMIN']} />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<OrganizerDashboard />} />
+            <Route path="workshops" element={<OrganizerWorkshopsPage />} />
+            <Route path="workshops/create" element={<CreateWorkshopPage />} />
+            <Route path="workshops/:id" element={<ManageWorkshopLayout />}>
+              <Route index element={<WorkshopOverviewPage />} />
+              <Route path="edit" element={<EditWorkshopPage />} />
+              <Route path="participants" element={<ParticipantsPage />} />
+              <Route path="sessions" element={<SessionsPage />} />
+              <Route path="attendance" element={<AttendanceOverviewPage />} />
+              <Route path="announcements" element={<AnnouncementsPage />} />
+            </Route>
+          </Route>
+
+          {/* Admin */}
+          <Route path="admin" element={<RequireAuth roles={['ADMIN']} />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="workshops" element={<AdminWorkshopsPage />} />
+            <Route path="organizers" element={<AdminOrganizersPage />} />
+            <Route path="participants" element={<AdminParticipantsPage />} />
+            <Route path="certificates" element={<AdminCertificatesPage />} />
+          </Route>
+
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    </>
   );
 }
