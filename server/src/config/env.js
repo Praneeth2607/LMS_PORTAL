@@ -38,6 +38,9 @@ const env = {
   // Self sign-ups with an email at this domain become ORGANIZERs.
   organizerEmailDomain: (process.env.ORGANIZER_EMAIL_DOMAIN || 'cict.in').trim().toLowerCase().replace(/^@/, ''),
   attendanceWindowMinutes: toInt(process.env.ATTENDANCE_WINDOW_MINUTES, 15),
+  // Attendance can be started from a session's start time until this many
+  // minutes after it ends.
+  attendanceCloseAfterEndMinutes: toInt(process.env.ATTENDANCE_CLOSE_AFTER_END_MINUTES, 120),
   certificateThreshold: toInt(process.env.CERTIFICATE_ATTENDANCE_THRESHOLD, 90),
 };
 

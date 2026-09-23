@@ -3,7 +3,7 @@ import env from '../config/env.js';
 import * as attendanceRepository from '../repositories/attendance.repository.js';
 import * as registrationRepository from '../repositories/registration.repository.js';
 import * as sessionRepository from '../repositories/session.repository.js';
-import { listSessions, getSessionContext } from './session.service.js';
+import { attendanceWindow, listSessions, getSessionContext } from './session.service.js';
 import { getManageableWorkshop } from './workshop.service.js';
 import { randomCode, randomToken, safeEqual } from '../utils/random.js';
 import { badRequest, conflict, forbidden, HttpError } from '../utils/httpError.js';
@@ -43,7 +43,21 @@ export async function startAttendance(sessionId, { durationMinutes }, user) {
   const { session, workshop } = await getSessionContext(sessionId, user, { manage: true });
   if (workshop.status === 'DRAFT') throw conflict('Publish the workshop before taking attendance');
 
-  const minutes = durationMinutes || env.attendanceWindowMinutes;
+  // Only from the session start until the configured time after it ends.
+  const { opensAt, closesAt } = attendanceWindow(session);
+  const now = Date.now();
+  if (now < opensAt.getTime()) {
+    throw conflict(`Attendance can be started from the session start time (${session.startTime} on ${session.sessionDate})`);
+  }
+  if (now >= closesAt.getTime()) {
+    const hours = env.attendanceCloseAfterEndMinutes / 60;
+    const after = Number.isInteger(hours) ? `${hours} hour${hours === 1 ? '' : 's'}` : `${env.attendanceCloseAfterEndMinutes} minutes`;
+    throw conflict(`Attendance for this session closed ${after} after it ended`);
+  }
+
+  // The QR/code never outlives the window: cap the duration at the close time.
+  const requested = durationMinutes || env.attendanceWindowMinutes;
+  const minutes = Math.max(1, Math.min(requested, Math.ceil((closesAt.getTime() - now) / 60_000)));
   const token = randomToken(32);
   const code = randomCode(6);
   const expiresAt = await sessionRepository.startAttendance(session.id, { token, code, minutes });

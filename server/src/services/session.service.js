@@ -1,6 +1,15 @@
 import * as sessionRepository from '../repositories/session.repository.js';
+import env from '../config/env.js';
 import { badRequest, conflict, notFound } from '../utils/httpError.js';
 import { canManage, canSeeMeetingLink, getManageableWorkshop, getVisibleWorkshop } from './workshop.service.js';
+
+// When the organizer may start QR/code attendance: from the session start
+// until ATTENDANCE_CLOSE_AFTER_END_MINUTES after it ends.
+export function attendanceWindow(session) {
+  const opensAt = new Date(session.startsAt);
+  const closesAt = new Date(new Date(session.endsAt).getTime() + env.attendanceCloseAfterEndMinutes * 60_000);
+  return { opensAt, closesAt };
+}
 
 // Hides the attendance secrets from everyone except the workshop managers, and
 // meeting links from people who are not registered.
@@ -10,7 +19,11 @@ function present(session, workshop, user) {
   return {
     ...rest,
     meetingLink: canSeeMeetingLink(workshop, user) ? session.meetingLink || workshop.meetingLink : null,
-    ...(manager && { attendanceCode: session.attendanceOpen ? attendanceCode : null }),
+    ...(manager && {
+      attendanceCode: session.attendanceOpen ? attendanceCode : null,
+      attendanceOpensAt: attendanceWindow(session).opensAt,
+      attendanceClosesAt: attendanceWindow(session).closesAt,
+    }),
     ...(user?.role === 'PARTICIPANT' && { myAttendanceStatus: myAttendanceStatus ?? null }),
   };
 }
