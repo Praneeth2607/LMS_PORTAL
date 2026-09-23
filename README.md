@@ -45,13 +45,11 @@ Prerequisites: Node.js 20+ and PostgreSQL 14+.
 npm install
 
 # 2. Configure environment
-cp server/.env.example server/.env    # then edit the PG* values and JWT_SECRET
+cp server/.env.example server/.env    # then set PGPASSWORD and JWT_SECRET
 cp client/.env.example client/.env    # optional in development
 
-# 3. Create and seed the database (see database/README.md)
-createdb -U postgres aurex26
-psql -U postgres -d aurex26 -f database/schema.sql
-psql -U postgres -d aurex26 -f database/seed.sql
+# 3. Create and seed the database (creates it if missing; see database/README.md)
+npm run db:reset
 
 # 4. Run API and client together
 npm run dev
@@ -60,7 +58,9 @@ npm run dev
 - Client: http://localhost:5173
 - API: http://localhost:5000/api/health
 
-The home page shows a green badge when it can reach the API.
+The home page shows a green badge when it can reach the API. Demo logins (password `Password@123`):
+`admin@aurex26.dev`, `meera@aurex26.dev` (organizer), `priya@aurex26.dev` (participant). The full list is in
+[database/README.md](database/README.md).
 
 ### Scripts (from the repo root)
 
@@ -71,6 +71,7 @@ The home page shows a green badge when it can reach the API.
 | `npm run dev:client` | Client only                           |
 | `npm run build`      | Production build of the client        |
 | `npm start`          | Start the API without watch mode      |
+| `npm run db:reset`   | Recreate the database from schema.sql + seed.sql (**deletes data**) |
 
 ## Team workflow
 
