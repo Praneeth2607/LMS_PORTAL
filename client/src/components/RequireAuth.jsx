@@ -7,7 +7,7 @@ import Icon from './Icon.jsx';
 // Route guard. Redirects guests to /login?next=… and blocks wrong roles.
 // The backend enforces the same rules; this only keeps the UI honest.
 export default function RequireAuth({ roles }) {
-  const { user, ready } = useAuth();
+  const { user, ready, signedOut } = useAuth();
   const location = useLocation();
 
   if (!ready) {
@@ -18,6 +18,10 @@ export default function RequireAuth({ roles }) {
     );
   }
 
+  // Deliberate sign-out: go home, and do not carry this page into the next login.
+  if (!user && signedOut) return <Navigate to="/" replace />;
+
+  // Not signed in (or the session expired): sign in, then come back here.
   if (!user) {
     const next = encodeURIComponent(`${location.pathname}${location.search}`);
     return <Navigate to={`/login?next=${next}`} replace />;
