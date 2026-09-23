@@ -55,7 +55,7 @@ form inputs. For registration form answers, `field` is the registration field's 
 
 1. `POST /api/auth/login` (or `/register`) returns `data.token`.
 2. Send it on every request: `Authorization: Bearer <token>`.
-3. Tokens expire after 1 day. **Any `401` means the token is missing, invalid or expired**: clear it and redirect to login.
+3. Tokens expire after 1 day. **Any `401` means the token is missing, invalid or expired, or the account was suspended**: clear it and redirect to login. Show `message` on the sign-in page, since it explains a suspension.
 
 ### Access levels used below
 
@@ -150,7 +150,11 @@ Response `201` (for a non-institute email):
 }
 ```
 
-Errors: `400` validation · `409` email already registered
+Errors:
+
+- `400` validation.
+- `403` `"This email can't be used to create an account. Please contact the CICT admin."`: the email belongs to a suspended account, or to a suspended account that an admin deleted. Only an admin can create an account with it.
+- `409` email already registered.
 
 ### POST `/api/auth/login`
 
@@ -160,7 +164,7 @@ Request: `{ "email": "meera@aurex26.dev", "password": "Password@123" }`
 
 Response `200`: same `data` shape as register (`{ token, user }`), with message `"Login successful"`.
 
-Errors: `400` validation · `401` `"Invalid email or password"`
+Errors: `400` validation · `401` `"Invalid email or password"` · `403` `"Your account has been suspended. Please contact the CICT admin."` (only shown after a correct password)
 
 ### GET `/api/auth/me`
 
@@ -474,7 +478,7 @@ The logged-in user's workshops. **The response shape depends on role.**
       "startDate": "2026-10-03", "endDate": "2026-10-04", "mode": "ONLINE", "venue": null,
       "meetingLink": "https://zoom.us/j/9876543210", "status": "PUBLISHED", "organizerName": "Dr. Meera Krishnan"
     },
-    "attendance": { "totalSessions": 2, "attendedSessions": 0, "percentage": 0, "threshold": 90, "eligible": false },
+    "attendance": { "totalSessions": 2, "completedSessions": 0, "attendedSessions": 0, "percentage": 0, "threshold": 90, "eligible": false },
     "certificate": null
   }
 ]
@@ -611,7 +615,12 @@ Errors: `401` · `403` · `404`
 
 ## Attendance
 
-Attendance percentage = PRESENT sessions ÷ **all** sessions of the workshop × 100, rounded to 2 decimals.
+Attendance percentage = sessions attended ÷ sessions **completed so far** × 100, rounded to 2 decimals.
+
+- A session counts as completed once its end time has passed (institute timezone).
+- `attendedSessions` counts only completed sessions, so attendance marked during a session counts once it ends.
+- Every attendance object also carries `totalSessions` (all scheduled sessions) and `completedSessions`.
+- `percentage` is `0` and `eligible` is `false` until at least one session has completed.
 It is always calculated by the server and never accepted from the client.
 
 ### POST `/api/sessions/:id/attendance/start`
@@ -743,7 +752,7 @@ Response `200`:
 ```json
 {
   "sessions": [
-    { "id": 1, "title": "Kickoff & Modern JavaScript", "sessionDate": "2026-09-09", "startTime": "10:00", "endTime": "12:30", "attendanceOpen": false }
+    { "id": 1, "title": "Kickoff & Modern JavaScript", "sessionDate": "2026-09-09", "startTime": "10:00", "endTime": "12:30", "status": "COMPLETED", "attendanceOpen": false }
   ],
   "participants": [
     {
@@ -751,6 +760,7 @@ Response `200`:
       "participantName": "Ananya Iyer",
       "participantEmail": "ananya@aurex26.dev",
       "totalSessions": 10,
+      "completedSessions": 10,
       "attendedSessions": 7,
       "percentage": 70,
       "threshold": 90,
@@ -781,15 +791,16 @@ Response `200`:
   "workshopId": 1,
   "threshold": 90,
   "totalSessions": 10,
+  "completedSessions": 10,
   "eligibleCount": 2,
   "participants": [
     { "participantId": 5, "participantName": "Rahul Verma", "participantEmail": "rahul@aurex26.dev",
-      "totalSessions": 10, "attendedSessions": 9, "percentage": 90, "threshold": 90, "eligible": true }
+      "totalSessions": 10, "completedSessions": 10, "attendedSessions": 9, "percentage": 90, "threshold": 90, "eligible": true }
   ]
 }
 ```
 
-`eligible` is `attendedSessions / totalSessions >= 90%`, and `false` when the workshop has no sessions.
+`eligible` is `attendedSessions / completedSessions >= 90%`, and `false` until a session has completed.
 **Do not compute eligibility in the frontend; use this field.**
 
 Errors: `401` · `403` · `404`
@@ -847,7 +858,15 @@ Response `200` (message e.g. `"2 certificate(s) generated, 0 already issued, 2 n
 }
 ```
 
-Errors: `409` workshop is a draft or has no sessions · `401` · `403` · `404`
+Errors:
+
+- `409` for any of these messages:
+  - `"Certificates can be generated after the last session ends (2 of 4 sessions completed)"`
+  - the workshop is a draft
+  - the workshop has no sessions
+- Also `401`, `403` and `404`.
+
+Certificates can only be generated once **every** session has ended. Because attendance is based on completed sessions, generating earlier could certify someone who had attended only the first few.
 
 ### GET `/api/workshops/:id/certificates`
 
@@ -994,13 +1013,29 @@ Response `200`:
 
 - `registrations` counts active (`REGISTERED`) registrations.
 - `attendanceMarked` counts `PRESENT` records.
-- `averageAttendance` is `presentCount / (registeredCount × sessionCount) × 100`.
+- `averageAttendance` is `presentCount / (registeredCount × completedSessionCount) × 100`, over completed sessions only; `presentCount` also only counts completed sessions.
 
 ### GET `/api/admin/users`
 
 Query (optional): `?role=ORGANIZER`, `?search=meera` (matches name or email).
 
-Response `200`: array of user objects (`id, name, email, role, createdAt, updatedAt`).
+Response `200`:
+
+```json
+[
+  {
+    "id": 4, "name": "Priya Sharma", "email": "priya@aurex26.dev", "role": "PARTICIPANT",
+    "suspendedAt": null,
+    "workshopsAttended": 2,
+    "certificatesCount": 1,
+    "createdAt": "2026-09-23T06:54:08.819Z", "updatedAt": "2026-09-23T06:54:08.819Z"
+  }
+]
+```
+
+- `suspendedAt`: `null` for active accounts, or when the account was suspended.
+- `workshopsAttended`: workshops where the user was marked PRESENT in at least one session.
+- `certificatesCount`: certificates issued to the user.
 
 ### POST `/api/admin/users`
 
@@ -1014,15 +1049,49 @@ Request:
 
 Response `201` (message `"User created"`): user object.
 
-Errors: `400` · `409` email exists
+Admins **can** use an email that is blocked from self sign-up (see [DELETE](#delete-apiadminusersid)). Creating the account lifts the block.
 
-### PATCH `/api/admin/users/:id/role`
+Errors: `400` · `409` email exists (for a suspended account: `"… Reactivate it instead of creating a new one."`)
 
-Request: `{ "role": "ORGANIZER" }`
+### PATCH `/api/admin/users/:id/suspend`
 
-Response `200` (message `"Role updated"`): user object.
+Suspends the account.
 
-Errors: `400` validation, or trying to change your own role · `404`
+- The user can no longer sign in (`403`).
+- Their current session stops working on the next request (`401` with the suspension message).
+- Their email cannot be used to self-register.
+
+No request body.
+
+Response `200` (message `"User suspended"`): user object with `suspendedAt` set.
+
+Errors: `400` your own account · `404`
+
+### PATCH `/api/admin/users/:id/reactivate`
+
+Lifts the suspension. No request body.
+
+Response `200` (message `"User reactivated"`): user object with `"suspendedAt": null`.
+
+Errors: `400` your own account · `404`
+
+### DELETE `/api/admin/users/:id`
+
+Permanently deletes the account, including its registrations, attendance and certificates.
+
+If the user was **suspended**, their email is added to a blocklist. Self sign-up with it then returns `403`, and only an admin can create an account with that email again. Deleting an active user does not block the email.
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "User deleted. Their email is blocked from signing up again.",
+  "data": { "id": 7, "email": "karthik@aurex26.dev", "emailBlocked": true }
+}
+```
+
+Errors: `400` your own account · `404` · `409` the user still organizes workshops (delete those first, or suspend instead)
 
 ---
 
@@ -1105,4 +1174,6 @@ Phones can't open `localhost`. Set `FRONTEND_URL` in `server/.env` to the laptop
 | GET    | `/api/admin/stats`                           | Admin       |
 | GET    | `/api/admin/users`                           | Admin       |
 | POST   | `/api/admin/users`                           | Admin       |
-| PATCH  | `/api/admin/users/:id/role`                  | Admin       |
+| PATCH  | `/api/admin/users/:id/suspend`               | Admin       |
+| PATCH  | `/api/admin/users/:id/reactivate`            | Admin       |
+| DELETE | `/api/admin/users/:id`                       | Admin       |

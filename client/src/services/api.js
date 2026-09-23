@@ -3,6 +3,24 @@
 
 const BASE_URL = `${import.meta.env.VITE_API_BASE_URL || ''}/api`;
 const TOKEN_KEY = 'aurex26_token';
+const AUTH_NOTICE_KEY = 'aurex26_auth_notice';
+
+// Why the last session ended (e.g. account suspended), for the sign-in page.
+export function readAuthNotice() {
+  try {
+    return sessionStorage.getItem(AUTH_NOTICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearAuthNotice() {
+  try {
+    sessionStorage.removeItem(AUTH_NOTICE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 export function getToken() {
   try {
@@ -66,9 +84,15 @@ async function toError(res) {
   const payload = await res.json().catch(() => null);
   const { status } = res;
 
-  // Expired or revoked session: drop the token and let AuthContext react.
+  // Expired, revoked or suspended session: drop the token, remember why (shown
+  // on the sign-in page) and let AuthContext react.
   if (status === 401 && getToken()) {
     setToken(null);
+    try {
+      sessionStorage.setItem(AUTH_NOTICE_KEY, payload?.message || FALLBACK_MESSAGES[401]);
+    } catch {
+      // storage unavailable: the sign-in page just won't explain why
+    }
     window.dispatchEvent(new Event('auth:expired'));
   }
 

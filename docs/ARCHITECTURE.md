@@ -98,6 +98,10 @@ Integrity is enforced by the database, not only the code:
 
 ### Authentication
 
+Suspended accounts (`users.suspended_at`) cannot sign in, and `authenticate` rejects their existing tokens with a
+`401`. When an admin deletes a suspended user, their email goes into `blocked_emails`. Self sign-up refuses those
+emails; an admin creating the account lifts the block.
+
 1. `POST /api/auth/login`: `bcrypt.compare` checks the password, then a JWT `{ sub: userId, role }` is signed with `JWT_SECRET` (valid for 1 day).
 2. The client sends `Authorization: Bearer <token>`.
 3. `authenticate` verifies the token **and reloads the user from the database**, so deleted users and role changes take effect immediately.
@@ -142,9 +146,12 @@ Starting attendance again replaces the token, so a photo of an old QR code stops
 
 ### Attendance percentage and the 90% rule
 
+Attendance is measured against **completed** sessions (end time passed, in `APP_TIMEZONE`), so it reflects
+progress so far. Certificates can only be generated once every session has ended.
+
 ```
-percentage = PRESENT sessions / all sessions of the workshop × 100    (2 decimals)
-eligible   = attended × 100 ≥ threshold × total   (integer math; threshold = 90 by default)
+percentage = PRESENT in completed sessions / completed sessions × 100   (2 decimals)
+eligible   = attended × 100 ≥ threshold × completed   (integer math; threshold = 90 by default)
 ```
 
 This is computed on every request in `attendance.service.calculateAttendance()` from the live rows. Nothing

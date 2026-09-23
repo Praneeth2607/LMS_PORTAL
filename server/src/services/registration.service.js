@@ -65,7 +65,7 @@ export async function myWorkshops(user) {
       status: row.workshopStatus,
       organizerName: row.organizerName,
     },
-    attendance: calculateAttendance(row.attendedSessions, row.totalSessions),
+    attendance: calculateAttendance(row.attendedSessions, row.completedSessions, row.totalSessions),
     certificate: row.certificateId ? { certificateId: row.certificateId, issuedAt: row.certificateIssuedAt } : null,
   }));
 }

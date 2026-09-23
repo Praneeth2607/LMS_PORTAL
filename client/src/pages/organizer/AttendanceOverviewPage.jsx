@@ -151,7 +151,11 @@ export default function AttendanceOverviewPage() {
         <SectionHeader eyebrow="Attendance" title="Who's been attending" />
         <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
           <StatTile label="Registered" value={summary.participants.length} />
-          <StatTile label="Sessions" value={summary.totalSessions} />
+          <StatTile
+            label="Sessions completed"
+            value={`${summary.completedSessions} / ${summary.totalSessions}`}
+            hint="Attendance % counts completed sessions only"
+          />
           <StatTile label="Eligible" value={summary.eligibleCount} hint={`At least ${summary.threshold}% attendance`} />
           <StatTile label="Certificates issued" value={certificates.length} />
         </div>
@@ -187,7 +191,8 @@ export default function AttendanceOverviewPage() {
               <thead>
                 <tr>
                   <th scope="col">Participant</th>
-                  <th scope="col">Sessions attended</th>
+                  <th scope="col">Total sessions</th>
+                  <th scope="col">Attended / completed</th>
                   <th scope="col">Attendance</th>
                   <th scope="col">Certificate</th>
                 </tr>
@@ -201,11 +206,16 @@ export default function AttendanceOverviewPage() {
                         <p className="font-medium">{p.participantName}</p>
                         <p className="text-[14px] text-slate">{p.participantEmail}</p>
                       </td>
-                      <td data-label="Attended">
-                        {p.attendedSessions} of {p.totalSessions}
+                      <td data-label="Total sessions">{p.totalSessions}</td>
+                      <td data-label="Attended / completed">
+                        {p.attendedSessions} / {p.completedSessions}
                       </td>
                       <td data-label="Attendance">
-                        <span className="text-[18px] font-medium">{formatPercent(p.percentage)}</span>
+                        {p.completedSessions > 0 ? (
+                          <span className="text-[18px] font-medium">{formatPercent(p.percentage)}</span>
+                        ) : (
+                          <span className="text-slate">No completed sessions yet</span>
+                        )}
                       </td>
                       <td data-label="Certificate">
                         {cert ? (
@@ -232,12 +242,23 @@ export default function AttendanceOverviewPage() {
         <h2 className="card-title">Issue certificates</h2>
         <p className="mt-2 max-w-2xl text-charcoal">
           Issues a certificate to every registered participant with at least {summary.threshold}% attendance who
-          doesn&rsquo;t have one yet. Safe to run again after more sessions.
+          doesn&rsquo;t have one yet. Available once the last session has ended. Safe to run again.
         </p>
+        {summary.completedSessions < summary.totalSessions && (
+          <p className="mt-3 text-[15px] font-medium text-charcoal">
+            {summary.completedSessions} of {summary.totalSessions} sessions completed. Certificates unlock when all sessions
+            have ended.
+          </p>
+        )}
         <button
           type="button"
           className="btn btn-primary mt-6"
-          disabled={generate.pending || workshop.status === 'DRAFT' || summary.totalSessions === 0}
+          disabled={
+            generate.pending ||
+            workshop.status === 'DRAFT' ||
+            summary.totalSessions === 0 ||
+            summary.completedSessions < summary.totalSessions
+          }
           onClick={onGenerate}
         >
           {generate.pending && <Spinner />} Generate certificates

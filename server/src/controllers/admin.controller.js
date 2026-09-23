@@ -26,7 +26,15 @@ export async function createUser(req, res) {
   sendCreated(res, await adminService.createUserAccount(data), 'User created');
 }
 
-export async function changeRole(req, res) {
-  const { role } = validate(req.body, { role: { type: 'enum', required: true, label: 'Role', values: ROLES } });
-  sendSuccess(res, await adminService.changeRole(parseId(req.params.id), role, req.user), 'Role updated');
+export async function suspend(req, res) {
+  sendSuccess(res, await adminService.suspendUser(parseId(req.params.id), req.user), 'User suspended');
+}
+
+export async function reactivate(req, res) {
+  sendSuccess(res, await adminService.reactivateUser(parseId(req.params.id), req.user), 'User reactivated');
+}
+
+export async function remove(req, res) {
+  const result = await adminService.deleteUser(parseId(req.params.id), req.user);
+  sendSuccess(res, result, result.emailBlocked ? 'User deleted. Their email is blocked from signing up again.' : 'User deleted');
 }
