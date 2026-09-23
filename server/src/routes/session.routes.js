@@ -10,6 +10,7 @@ const manager = [authenticate, authorize('ORGANIZER', 'ADMIN')];
 router.get('/:id', optionalAuthenticate, sessionController.get);
 router.put('/:id', ...manager, sessionController.update);
 router.delete('/:id', ...manager, sessionController.remove);
+router.post('/:id/start', ...manager, sessionController.start);
 
 router.post('/:id/attendance/start', ...manager, attendanceController.start);
 router.post('/:id/attendance/stop', ...manager, attendanceController.stop);

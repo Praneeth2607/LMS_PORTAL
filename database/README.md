@@ -29,6 +29,21 @@ psql -U postgres -d aurex26 -f database/schema.sql
 psql -U postgres -d aurex26 -f database/seed.sql
 ```
 
+## Migrations (databases that already hold data)
+
+When the schema changes, a migration is added to `database/migrations/` (and `schema.sql` is updated for fresh setups).
+To bring an existing database, such as the shared Supabase one, up to date **without losing data**:
+
+```bash
+npm run db:migrate
+```
+
+Migrations are additive and idempotent (`ADD COLUMN IF NOT EXISTS` …), so running this again is harmless.
+
+| Migration                       | Adds                                           |
+| ------------------------------- | ---------------------------------------------- |
+| `001_session_started_at.sql`    | `sessions.started_at`, for the organizer's "Start session" button |
+
 ## Demo accounts
 
 Password for all: **`Password@123`**

@@ -14,7 +14,8 @@
     "dev:client": "npm run dev --workspace client",
     "build": "npm run build --workspace client",
     "start": "npm run start --workspace server",
-    "db:reset": "npm run db:reset --workspace server"
+    "db:reset": "npm run db:reset --workspace server",
+    "db:migrate": "npm run db:migrate --workspace server"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

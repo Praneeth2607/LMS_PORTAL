@@ -29,6 +29,11 @@ const env = {
     expiresIn: process.env.JWT_EXPIRES_IN || '1d',
   },
 
+  // Timezone that session dates/times are written in. Sessions store local
+  // wall-clock times; this decides when "2:00 PM" actually happens (the DB
+  // itself may run in UTC, as Supabase does).
+  appTimezone: process.env.APP_TIMEZONE || 'Asia/Kolkata',
+
   bcryptSaltRounds: toInt(process.env.BCRYPT_SALT_ROUNDS, 10),
   // Self sign-ups with an email at this domain become ORGANIZERs.
   organizerEmailDomain: (process.env.ORGANIZER_EMAIL_DOMAIN || 'cict.in').trim().toLowerCase().replace(/^@/, ''),
@@ -37,6 +42,12 @@ const env = {
 };
 
 env.isProduction = env.nodeEnv === 'production';
+
+try {
+  new Intl.DateTimeFormat('en', { timeZone: env.appTimezone });
+} catch {
+  throw new Error(`APP_TIMEZONE "${env.appTimezone}" is not a valid IANA timezone (e.g. Asia/Kolkata)`);
+}
 
 if (env.isProduction && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET must be set in production');

@@ -39,6 +39,7 @@ import {
   isSessionUpcoming,
   modeLabel,
   roleLabel,
+  sessionLiveStatus,
   sessionStart,
 } from '../../utils/format.js';
 
@@ -120,7 +121,8 @@ export function ParticipantDashboard() {
                         {formatTime(s.startTime)} – {formatTime(s.endTime)}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {sessionLiveStatus(s) === 'ONGOING' && <StatusBadge status="ONGOING" />}
                       {s.attendanceOpen && s.myAttendanceStatus !== 'PRESENT' && (
                         <Link to={`/attendance/${s.id}`} className="btn btn-primary">
                           Mark attendance

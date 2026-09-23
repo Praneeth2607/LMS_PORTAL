@@ -72,6 +72,7 @@ The home page shows a green badge when it can reach the API. Demo logins (passwo
 | `npm run build`      | Production build of the client        |
 | `npm start`          | Start the API without watch mode      |
 | `npm run db:reset`   | Recreate the database from schema.sql + seed.sql (**deletes data**) |
+| `npm run db:migrate` | Apply new migrations to an existing database (keeps data) |
 
 ## Team workflow
 

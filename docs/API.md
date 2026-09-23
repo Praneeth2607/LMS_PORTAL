@@ -498,6 +498,10 @@ The logged-in user's workshops. **The response shape depends on role.**
   "sessionDate": "2026-09-23",
   "startTime": "14:00",
   "endTime": "16:00",
+  "startsAt": "2026-09-23T08:30:00.000Z",
+  "endsAt": "2026-09-23T10:30:00.000Z",
+  "startedAt": null,
+  "status": "READY",
   "meetingLink": "https://meet.google.com/abc-defg-hij",
   "attendanceOpen": false,
   "attendanceExpiresAt": null,
@@ -508,6 +512,17 @@ The logged-in user's workshops. **The response shape depends on role.**
 }
 ```
 
+- `status`: where the session is in its lifecycle, calculated by the server:
+
+  | `status`     | Meaning                                                              |
+  | ------------ | -------------------------------------------------------------------- |
+  | `SCHEDULED`  | Start time not reached yet                                           |
+  | `READY`      | Start time reached; the organizer can press Start                    |
+  | `ONGOING`    | The organizer started it ([POST /api/sessions/:id/start](#post-apisessionsidstart)) and it hasn't ended |
+  | `COMPLETED`  | End time has passed                                                  |
+
+- `startsAt` / `endsAt`: the session's start and end as exact UTC timestamps (`sessionDate` + `startTime`/`endTime` in the institute timezone, `APP_TIMEZONE`, default Asia/Kolkata). Compare these with the current time to switch a button on at the right moment without reloading; `status` is only as fresh as the last request.
+- `startedAt`: when the organizer pressed Start, or `null`. Editing the date or times clears it.
 - `meetingLink`: the session's own link, falling back to the workshop's. It is `null` unless the viewer is registered or manages the workshop.
 - `attendanceOpen`: `true` while the QR/code is accepting scans (started and not expired).
 - `myAttendanceStatus`: **participants only**. `"PRESENT"`, `"ABSENT"` or `null` (not marked).
@@ -560,6 +575,27 @@ Partial update; the fields and rules are the same as create.
 Response `200` (message `"Session updated"`): session object.
 
 Errors: `400` · `401` · `403` · `404`
+
+### POST `/api/sessions/:id/start`
+
+The organizer starts the session, which makes it `ONGOING`. Allowed from the scheduled start time until the end time, and
+checked against the server clock. Pressing it again while `ONGOING` is fine: it returns the session unchanged, which
+is useful for reopening the meeting link. For online and hybrid workshops the frontend opens `meetingLink` after a
+successful start.
+
+**Access:** Manager (owner or admin)
+
+Request body: none.
+
+Response `200` (message `"Session started"`): the [session object](#session-object) with `"status": "ONGOING"` and `startedAt` set.
+
+Errors:
+
+- `409` for any of these messages:
+  - `"This session can be started from 14:00 on 2026-09-23"` (too early)
+  - `"This session has already ended"`
+  - `"Publish the workshop before starting its sessions"`
+- Also `401`, `403` and `404`.
 
 ### DELETE `/api/sessions/:id`
 
@@ -1051,6 +1087,7 @@ Phones can't open `localhost`. Set `FRONTEND_URL` in `server/.env` to the laptop
 | GET    | `/api/sessions/:id`                          | Optional    |
 | PUT    | `/api/sessions/:id`                          | Manager     |
 | DELETE | `/api/sessions/:id`                          | Manager     |
+| POST   | `/api/sessions/:id/start`                    | Manager     |
 | POST   | `/api/sessions/:id/attendance/start`         | Manager     |
 | POST   | `/api/sessions/:id/attendance/mark`          | Participant |
 | POST   | `/api/sessions/:id/attendance/stop`          | Manager     |
