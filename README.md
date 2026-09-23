@@ -74,6 +74,8 @@ The home page shows a green badge when it can reach the API. Demo logins (passwo
 | `npm run db:reset`   | Recreate the database from schema.sql + seed.sql (**deletes data**) |
 | `npm run db:migrate` | Apply new migrations to an existing database (keeps data) |
 
+Live online sessions run inside the portal on Jitsi as a Service (8x8.vc). Put the `JAAS_*` keys in `server/.env` and the private key in `server/secrets/` (see `server/.env.example`).
+
 ## Team workflow
 
 - The base structure is committed on `main` before any feature work. Don't restructure folders

@@ -136,7 +136,33 @@ SCHEDULED ──(start time reached)──► READY ──(organizer presses Sta
   For online and hybrid workshops it opens the meeting link; for offline ones it only marks the session Ongoing.
 - Rescheduling a session clears `started_at`.
 
-### QR attendance
+### Live sessions and proof of active presence
+
+Online and hybrid sessions run inside the portal on **Jitsi as a Service (JaaS, 8x8.vc)** (or Daily.co with `VIDEO_PROVIDER=daily`). Meet and Zoom cannot be embedded, so presence
+could not be verified there.
+
+```
+Participant opens /sessions/:id/live
+  → POST /sessions/:id/video/join   (server names/reuses the room, returns a personal signed token)
+  → JaaS external_api.js embeds the call (loaded only on this page)
+  → useActivePresence: heartbeat every 60s while ALL of:
+        in the call (videoConferenceJoined) · page visible/focused · not idle (2 min, then "Are you still there?")
+  → POST /sessions/:id/heartbeat    (server measures the gap with its own clock; spam → 429; long gap → no credit)
+  → at 75% of the session length: attendance PRESENT (method PRESENCE), recorded automatically
+```
+
+- `video.service.js`: the video provider: JaaS JWTs signed with our private key (RS256), or the Daily REST client.
+- `presence.service.js`: joining, heartbeat rules and status.
+- `session_watch_logs`: verified seconds per participant per session.
+
+Clicking into the call iframe counts as focus. Activity inside the iframe is invisible to the page, so the idle
+prompt asks the person to confirm they're there.
+
+**Limitations** (worth stating honestly): this proves activity, not attention. A mouse jiggler or a second device can defeat it.
+
+**Demo mode** (`PRESENCE_DEMO_MODE=true`) is set on the server only: heartbeats every 5s, each counting as 15 minutes.
+
+### QR attendance (in-person)
 
 ```
 Organizer: POST /sessions/:id/attendance/start
@@ -205,6 +231,9 @@ certificate. If the QR code's token is supplied, it must match.
 The routes `/attendance/:sessionId` and `/verify/:certificateId` are required, because the QR codes point to them (see API.md).
 
 ## Environment
+
+- Live sessions need `JAAS_APP_ID`, `JAAS_KEY_ID` and `JAAS_PRIVATE_KEY_PATH` (jaas.8x8.vc → API Keys; keep the key in the git-ignored `server/secrets/`), or `VIDEO_PROVIDER=daily` + `DAILY_API_KEY`. Without it, the live room shows "Live video isn't set up yet"; everything else still works.
+- Presence settings: `PRESENCE_THRESHOLD_PERCENT` (75), `HEARTBEAT_INTERVAL_SECONDS` (60), `IDLE_TIMEOUT_SECONDS` (120), `PRESENCE_DEMO_MODE` (false).
 
 - `server/.env` (copy from `server/.env.example`) sets:
   - `PORT` and `FRONTEND_URL` (used for CORS and the QR URLs);

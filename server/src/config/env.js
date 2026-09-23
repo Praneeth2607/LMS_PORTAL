@@ -35,6 +35,36 @@ const env = {
   appTimezone: process.env.APP_TIMEZONE || 'Asia/Kolkata',
 
   bcryptSaltRounds: toInt(process.env.BCRYPT_SALT_ROUNDS, 10),
+
+  // Live sessions inside the portal: "jitsi" (JaaS, 8x8.vc) or "daily".
+  // Without the provider's keys the live room is unavailable (the rest of the
+  // app works normally).
+  videoProvider: (process.env.VIDEO_PROVIDER || (process.env.DAILY_API_KEY && !process.env.JAAS_APP_ID ? 'daily' : 'jitsi')).toLowerCase(),
+  jaas: {
+    appId: (process.env.JAAS_APP_ID || '').trim(),
+    keyId: (process.env.JAAS_KEY_ID || '').trim(),
+    // Relative paths are resolved from the server folder.
+    privateKeyPath: process.env.JAAS_PRIVATE_KEY_PATH || '',
+    domain: process.env.JAAS_DOMAIN || '8x8.vc',
+  },
+  daily: {
+    apiKey: process.env.DAILY_API_KEY || '',
+    apiBase: (process.env.DAILY_API_BASE || 'https://api.daily.co/v1').replace(/\/+$/, ''),
+  },
+
+  // Proof-of-active-presence for online/hybrid sessions. Demo mode (for
+  // judging only) makes heartbeats every 5s count as 15 minutes each.
+  presence: (() => {
+    const demoMode = process.env.PRESENCE_DEMO_MODE === 'true';
+    return {
+      demoMode,
+      thresholdPercent: toInt(process.env.PRESENCE_THRESHOLD_PERCENT, 75),
+      heartbeatSeconds: demoMode ? 5 : toInt(process.env.HEARTBEAT_INTERVAL_SECONDS, 60),
+      idleTimeoutSeconds: demoMode ? 15 : toInt(process.env.IDLE_TIMEOUT_SECONDS, 120),
+      creditMultiplier: demoMode ? 180 : 1,
+    };
+  })(),
+
   attendanceWindowMinutes: toInt(process.env.ATTENDANCE_WINDOW_MINUTES, 15),
   // Attendance can be started from a session's start time until this many
   // minutes after it ends.
@@ -48,6 +78,14 @@ try {
   new Intl.DateTimeFormat('en', { timeZone: env.appTimezone });
 } catch {
   throw new Error(`APP_TIMEZONE "${env.appTimezone}" is not a valid IANA timezone (e.g. Asia/Kolkata)`);
+}
+
+if (!['jitsi', 'daily'].includes(env.videoProvider)) {
+  throw new Error(`VIDEO_PROVIDER "${env.videoProvider}" must be "jitsi" or "daily"`);
+}
+
+if (env.presence.demoMode) {
+  console.warn('PRESENCE_DEMO_MODE is ON: each 5s heartbeat counts as 15 minutes. Never use this for real sessions.');
 }
 
 if (env.isProduction && !process.env.JWT_SECRET) {

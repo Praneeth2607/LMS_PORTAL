@@ -18,6 +18,14 @@ export async function markPresent(sessionId, participantId, method) {
   return camelize(rows[0]) || null;
 }
 
+export async function findOne(sessionId, participantId) {
+  const { rows } = await query(
+    'SELECT * FROM attendance WHERE session_id = $1 AND participant_id = $2',
+    [sessionId, participantId],
+  );
+  return camelize(rows[0]) || null;
+}
+
 export async function setManual(sessionId, participantId, status) {
   const { rows } = await query(
     `INSERT INTO attendance (session_id, participant_id, status, method)

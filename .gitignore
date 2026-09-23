@@ -25,3 +25,8 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Secrets (JaaS private key etc.)
+server/secrets/
+*.pem
+*.pk

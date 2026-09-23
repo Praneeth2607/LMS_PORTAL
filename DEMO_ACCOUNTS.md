@@ -29,6 +29,20 @@ These accounts come from `database/seed.sql`. They are available after running `
 | Sneha Patel  | `sneha@aurex26.dev`   | Registered for ML and Cybersecurity: live QR check-in         |
 | Vikram Singh | `vikram@aurex26.dev`  | Not registered anywhere: live registration                    |
 
+## Live session demo (proof of active presence)
+
+1. In `server/.env`, set the `JAAS_*` keys (see `server/.env.example`) and, **for the demo only**, `PRESENCE_DEMO_MODE=true` (5 seconds counts as 15 minutes). Restart the server.
+2. As `meera@aurex26.dev` (Organizer tab), open **Cybersecurity Essentials → Sessions**. Edit a session so it runs now, then click **Start & open live room**.
+3. As `sneha@aurex26.dev` (Participant tab), click **Join session** on the dashboard and join the call. Watch the tracker:
+   - it counts while you stay on the tab;
+   - it pauses if you switch tabs;
+   - after 15s of no mouse or keyboard activity it asks "Are you still there?";
+   - after about 15 seconds of tracked time it shows **Attendance recorded**.
+4. In Meera's live room, the participant list shows Sneha as *Watching now* and *Present*.
+
+Each person who joins counts toward the JaaS free plan's monthly active users (25). End the call when you're done, and set
+`PRESENCE_DEMO_MODE=false` afterwards.
+
 ## Quick demo path
 
 1. **Organizer:** sign in as `arjun@aurex26.dev`. Open the ML workshop, go to **Sessions**, then **Start attendance** to show the QR code.

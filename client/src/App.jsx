@@ -12,6 +12,7 @@ import VerifyPage from './pages/public/VerifyPage.jsx';
 import AttendancePage from './pages/public/AttendancePage.jsx';
 import CertificatePage from './pages/public/CertificatePage.jsx';
 import NotFoundPage from './pages/public/NotFoundPage.jsx';
+import SessionLivePage from './pages/SessionLivePage.jsx';
 
 import {
   MyCertificatesPage,
@@ -71,6 +72,8 @@ export default function App() {
           {/* Any signed-in user (backend checks ownership) */}
           <Route element={<RequireAuth />}>
             <Route path="certificates/:id" element={<CertificatePage />} />
+            {/* Live room inside the portal (online/hybrid); the server checks who may join. */}
+            <Route path="sessions/:id/live" element={<SessionLivePage />} />
           </Route>
 
           {/* Participant */}
