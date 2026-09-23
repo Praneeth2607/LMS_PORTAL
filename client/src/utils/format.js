@@ -107,11 +107,20 @@ export function formatCountdown(ms) {
 
 export const firstName = (name = '') => name.replace(/^(Dr|Prof|Mr|Ms|Mrs)\.?\s+/i, '').split(' ')[0];
 
+// Status to display for a workshop. The database only knows DRAFT / PUBLISHED /
+// CLOSED (CLOSED = registration closed), so a closed workshop that is still
+// running (today within its dates) is shown as ONGOING instead of CLOSED.
+export function workshopDisplayStatus(workshop, today = todayISO()) {
+  if (workshop.status === 'CLOSED' && workshop.startDate <= today && today <= workshop.endDate) return 'ONGOING';
+  return workshop.status;
+}
+
 // Registration state shown on workshop cards and detail pages (display only;
 // the backend still enforces every rule on register).
 export function registrationState(workshop) {
   if (workshop.isRegistered) return { label: 'Registered', tone: 'strong' };
   if (workshop.status === 'DRAFT') return { label: 'Draft', tone: 'neutral' };
+  if (workshopDisplayStatus(workshop) === 'ONGOING') return { label: 'Ongoing', tone: 'strong' };
   if (workshop.status === 'CLOSED') return { label: 'Registration closed', tone: 'muted' };
   if (workshop.capacity && workshop.registeredCount >= workshop.capacity) return { label: 'Full', tone: 'muted' };
   return { label: 'Open for registration', tone: 'accent' };

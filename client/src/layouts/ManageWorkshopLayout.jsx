@@ -3,7 +3,7 @@ import { useAsync } from '../hooks/useAsync.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getWorkshop } from '../services/workshopService.js';
 import { BackLink, ErrorState, LoadingBlock, StatusBadge } from '../components/ui.jsx';
-import { formatDateRange, modeLabel } from '../utils/format.js';
+import { formatDateRange, modeLabel, workshopDisplayStatus } from '../utils/format.js';
 import { Page } from './AppLayout.jsx';
 
 const SECTIONS = [
@@ -52,7 +52,7 @@ export default function ManageWorkshopLayout() {
       <BackLink to={backTo}>All workshops</BackLink>
       <header className="mb-10 md:mb-14">
         <div className="mb-5 flex flex-wrap items-center gap-3">
-          <StatusBadge status={workshop.status} />
+          <StatusBadge status={workshopDisplayStatus(workshop)} />
           <span className="eyebrow">{modeLabel(workshop.mode)}</span>
         </div>
         <h1 className="page-title max-w-4xl">{workshop.title}</h1>

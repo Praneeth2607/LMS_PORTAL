@@ -21,7 +21,14 @@ import {
 import { SelectField, TextField, fieldErrors } from '../../components/Form.jsx';
 import Icon from '../../components/Icon.jsx';
 import { WorkshopListView } from '../organizer/OrganizerPages.jsx';
-import { formatDate, formatDateRange, formatDateTime, formatPercent, roleLabel } from '../../utils/format.js';
+import {
+  formatDate,
+  formatDateRange,
+  formatDateTime,
+  formatPercent,
+  roleLabel,
+  workshopDisplayStatus,
+} from '../../utils/format.js';
 import { manageWorkshopPath } from '../../utils/roles.js';
 
 // ======================================================================
@@ -85,7 +92,7 @@ export function AdminDashboard() {
                         </p>
                       </td>
                       <td data-label="Status">
-                        <StatusBadge status={w.status} />
+                        <StatusBadge status={workshopDisplayStatus(w)} />
                       </td>
                       <td data-label="Registered">{w.registeredCount}</td>
                       <td data-label="Sessions">{w.sessionCount}</td>
