@@ -15,6 +15,7 @@ import {
   registrationState,
   seatsLabel,
   sessionLiveStatus,
+  workshopDisplayStatus,
 } from '../utils/format.js';
 
 // ---------------------------------------------------------------- Catalogue card
@@ -22,7 +23,7 @@ export function WorkshopCard({ workshop, to = `/workshops/${workshop.id}` }) {
   const state = registrationState(workshop);
   return (
     <article className="group relative flex items-start gap-5 border-t rule py-8 md:gap-10 md:py-10">
-      <DateDisc date={workshop.startDate} tone={workshop.status === 'CLOSED' ? 'cream' : 'white'} />
+      <DateDisc date={workshop.startDate} tone={workshopDisplayStatus(workshop) === 'CLOSED' ? 'cream' : 'white'} />
       <div className="min-w-0 flex-1">
         <p className="eyebrow">{modeLabel(workshop.mode)}</p>
         <h3 className="card-title mt-3 md:text-[28px]">

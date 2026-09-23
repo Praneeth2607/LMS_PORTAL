@@ -43,6 +43,7 @@ import {
   modeLabel,
   sessionLiveStatus,
   sessionStart,
+  workshopDisplayStatus,
 } from '../../utils/format.js';
 import { manageWorkshopPath } from '../../utils/roles.js';
 
@@ -188,6 +189,7 @@ const FILTERS = [
   { value: '', label: 'All' },
   { value: 'DRAFT', label: 'Drafts' },
   { value: 'PUBLISHED', label: 'Published' },
+  { value: 'ONGOING', label: 'Ongoing' },
   { value: 'CLOSED', label: 'Closed' },
 ];
 
@@ -219,7 +221,7 @@ export function WorkshopTable({ workshops, showOrganizer = false }) {
             {showOrganizer && <td data-label="Organizer">{w.organizerName}</td>}
             <td data-label="Dates">{formatDateRange(w.startDate, w.endDate)}</td>
             <td data-label="Status">
-              <StatusBadge status={w.status} />
+              <StatusBadge status={workshopDisplayStatus(w)} />
             </td>
             <td data-label="Registered">
               {w.registeredCount}
@@ -241,7 +243,8 @@ export function WorkshopTable({ workshops, showOrganizer = false }) {
 export function WorkshopListView({ loader, title, description, showOrganizer, actions }) {
   const [filter, setFilter] = useState('');
   const { data, error, loading, reload } = useAsync(loader, []);
-  const rows = (data || []).filter((w) => !filter || w.status === filter);
+  // Filter on the displayed status, so running closed workshops sit under Ongoing.
+  const rows = (data || []).filter((w) => !filter || workshopDisplayStatus(w) === filter);
 
   return (
     <Page>
@@ -257,7 +260,7 @@ export function WorkshopListView({ loader, title, description, showOrganizer, ac
           >
             {f.label}
             {data && (
-              <span className="opacity-60">{f.value ? data.filter((w) => w.status === f.value).length : data.length}</span>
+              <span className="opacity-60">{f.value ? data.filter((w) => workshopDisplayStatus(w) === f.value).length : data.length}</span>
             )}
           </button>
         ))}
@@ -397,7 +400,7 @@ export function WorkshopOverviewPage() {
           hint={workshop.capacity ? `of ${workshop.capacity} seats` : 'Unlimited seats'}
         />
         <StatTile label="Sessions" value={workshop.sessionCount} />
-        <StatTile label="Status" value={<StatusBadge status={workshop.status} className="!text-[16px]" />} />
+        <StatTile label="Status" value={<StatusBadge status={workshopDisplayStatus(workshop)} className="!text-[16px]" />} />
       </div>
 
       <section className="panel">
@@ -405,7 +408,10 @@ export function WorkshopOverviewPage() {
         <p className="mt-2 text-charcoal">
           {workshop.status === 'DRAFT' && 'Only you and admins can see this draft. Publish it to open registration.'}
           {workshop.status === 'PUBLISHED' && 'Visible in the catalogue and open for registration.'}
-          {workshop.status === 'CLOSED' && 'Registration is closed. Attendance and certificates still work.'}
+          {workshop.status === 'CLOSED' &&
+            (workshopDisplayStatus(workshop) === 'ONGOING'
+              ? 'The workshop is ongoing and registration is closed. Attendance and certificates still work.'
+              : 'Registration is closed. Attendance and certificates still work.')}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           {workshop.status !== 'PUBLISHED' && (
