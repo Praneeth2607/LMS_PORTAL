@@ -8,7 +8,15 @@ import { EmptyState, ErrorState, LoadingBlock, Notice, SectionHeader, Spinner, S
 import { SelectField, TextField, fieldErrors } from '../../components/Form.jsx';
 import Modal from '../../components/Modal.jsx';
 import Icon from '../../components/Icon.jsx';
-import { formatCountdown, formatDate, formatDateTime, formatTime, sessionLiveStatus } from '../../utils/format.js';
+import {
+  attendanceWindowState,
+  formatClock,
+  formatCountdown,
+  formatDate,
+  formatDateTime,
+  formatTime,
+  sessionLiveStatus,
+} from '../../utils/format.js';
 
 // ---------------------------------------------------------------- Session form
 function SessionForm({ workshop, initial, onSaved, onCancel }) {
@@ -75,6 +83,7 @@ function SessionForm({ workshop, initial, onSaved, onCancel }) {
 const DURATIONS = [5, 10, 15, 30, 60].map((m) => ({ value: String(m), label: `${m} minutes` }));
 
 function AttendanceModal({ session, workshop, onClose, onChanged }) {
+  const windowClosed = attendanceWindowState(session) === 'CLOSED';
   const [duration, setDuration] = useState('15');
   const [live, setLive] = useState(null); // response from POST .../attendance/start
   const [stopped, setStopped] = useState(null); // response from POST .../attendance/stop
@@ -188,7 +197,7 @@ function AttendanceModal({ session, workshop, onClose, onChanged }) {
 
             <div className="mt-8 flex flex-wrap gap-3">
               {expired ? (
-                <button type="button" className="btn btn-primary" disabled={action.pending} onClick={start}>
+                <button type="button" className="btn btn-primary" disabled={action.pending || windowClosed} onClick={start}>
                   {action.pending && <Spinner />} Start again with a new code
                 </button>
               ) : (
@@ -222,6 +231,12 @@ function AttendanceModal({ session, workshop, onClose, onChanged }) {
     </Modal>
   );
 }
+
+// "2 hours" / "90 minutes" for a duration in milliseconds.
+const formatGap = (ms) => {
+  const minutes = Math.round(ms / 60_000);
+  return minutes % 60 === 0 ? `${minutes / 60} hour${minutes === 60 ? '' : 's'}` : `${minutes} minutes`;
+};
 
 // ---------------------------------------------------------------- Start / join control
 // status is the live lifecycle (see sessionLiveStatus). The server enforces the
@@ -409,9 +424,16 @@ export default function SessionsPage() {
                     <p className="text-[18px] font-medium">{session.title}</p>
                     <StatusBadge status={sessionLiveStatus(session, now)} />
                   </div>
+                  {attendanceWindowState(session, now) === 'CLOSED' && !session.attendanceOpen && (
+                    <p className="mt-1 text-[14px] text-slate">
+                      Attendance closed at {formatClock(session.attendanceClosesAt)} (
+                      {formatGap(new Date(session.attendanceClosesAt) - new Date(session.endsAt))} after the session ended).
+                    </p>
+                  )}
                   {sessionLiveStatus(session, now) === 'SCHEDULED' && (
                     <p className="mt-1 text-[14px] text-slate">
-                      You can start this session at {formatTime(session.startTime)} on {formatDate(session.sessionDate)}.
+                      You can start this session and take attendance from {formatTime(session.startTime)} on{' '}
+                      {formatDate(session.sessionDate)}.
                     </p>
                   )}
                   {session.attendanceOpen && (
@@ -433,7 +455,12 @@ export default function SessionsPage() {
                   />
                   {session.attendanceOpen ? (
                     <>
-                      <button type="button" className="btn btn-secondary" onClick={() => setAttendanceFor(session)}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        disabled={attendanceWindowState(session, now) !== 'OPEN'}
+                        onClick={() => setAttendanceFor(session)}
+                      >
                         <Icon name="qr" size={18} /> New QR
                       </button>
                       <button type="button" className="btn btn-secondary" disabled={action.pending} onClick={() => onStopFromRow(session)}>
@@ -444,7 +471,14 @@ export default function SessionsPage() {
                     <button
                       type="button"
                       className="btn btn-secondary"
-                      disabled={workshop.status === 'DRAFT'}
+                      disabled={workshop.status === 'DRAFT' || attendanceWindowState(session, now) !== 'OPEN'}
+                      title={
+                        attendanceWindowState(session, now) === 'BEFORE'
+                          ? `Available from ${formatTime(session.startTime)}`
+                          : attendanceWindowState(session, now) === 'CLOSED'
+                            ? 'Attendance window has closed'
+                            : undefined
+                      }
                       onClick={() => setAttendanceFor(session)}
                     >
                       <Icon name="qr" size={18} /> Start attendance

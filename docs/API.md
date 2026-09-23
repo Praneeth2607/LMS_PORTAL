@@ -361,7 +361,15 @@ Sets status to `CLOSED`, which stops new registrations. Attendance and certifica
 
 Response `200` (message `"Workshop closed"`): workshop object.
 
-Errors: `409` workshop is still a draft · `401` · `403` · `404`
+Allowed only between `attendanceOpensAt` (session start) and `attendanceClosesAt` (2 hours after the session ends). If fewer minutes than `durationMinutes` remain before the close time, the code expires at the close time and `durationMinutes` in the response is reduced to match.
+
+Errors:
+
+- `409` for any of these messages:
+  - `"Attendance can be started from the session start time (14:00 on 2026-09-23)"`
+  - `"Attendance for this session closed 2 hours after it ended"`
+  - the workshop is still a draft
+- Also `401`, `403` and `404`.
 
 ---
 
@@ -531,6 +539,7 @@ The logged-in user's workshops. **The response shape depends on role.**
 - `attendanceOpen`: `true` while the QR/code is accepting scans (started and not expired).
 - `myAttendanceStatus`: **participants only**. `"PRESENT"`, `"ABSENT"` or `null` (not marked).
 - `attendanceCode`: **managers only**. The 6-character fallback code while attendance is open, otherwise `null`.
+- `attendanceOpensAt` / `attendanceClosesAt`: **managers only**. The window in which [start attendance](#post-apisessionsidattendancestart) is allowed: from the session start until 2 hours after it ends (`ATTENDANCE_CLOSE_AFTER_END_MINUTES`).
 - The QR token itself is never included; it is only returned by [start](#post-apisessionsidattendancestart).
 
 ### GET `/api/workshops/:id/sessions`

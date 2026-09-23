@@ -76,6 +76,22 @@ export function sessionLiveStatus(session, now = Date.now()) {
   return 'SCHEDULED';
 }
 
+// Whether the organizer can start QR/code attendance right now, from the
+// backend's attendanceOpensAt/attendanceClosesAt (the server enforces it too).
+//   BEFORE (not started yet) | OPEN | CLOSED (too long after the session ended)
+export function attendanceWindowState(session, now = Date.now()) {
+  if (!session.attendanceOpensAt) return 'OPEN';
+  if (now < new Date(session.attendanceOpensAt).getTime()) return 'BEFORE';
+  if (now >= new Date(session.attendanceClosesAt).getTime()) return 'CLOSED';
+  return 'OPEN';
+}
+
+// "2:00 PM" for an ISO timestamp.
+export function formatClock(iso) {
+  const d = new Date(iso);
+  return formatTime(`${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`);
+}
+
 export function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
