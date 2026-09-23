@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useAction, useDocumentTitle } from '../../hooks/useUtils.js';
 import { TextField, fieldErrors } from '../../components/Form.jsx';
 import { Eyebrow, Notice, Orbit, Spinner } from '../../components/ui.jsx';
-import { homeFor, safeNext } from '../../utils/roles.js';
+import { destinationAfterAuth, safeNext } from '../../utils/roles.js';
 
 function AuthShell({ eyebrow, title, intro, children, footer }) {
   return (
@@ -33,12 +33,12 @@ export function LoginPage() {
   const { pending, error, run } = useAction();
   const errors = fieldErrors(error);
 
-  if (user) return <Navigate to={next || homeFor(user)} replace />;
+  if (user) return <Navigate to={destinationAfterAuth(next, user)} replace />;
 
   const onSubmit = async (e) => {
     e.preventDefault();
     const result = await run(() => login(form));
-    if (result.ok) navigate(next || homeFor(result.data), { replace: true });
+    if (result.ok) navigate(destinationAfterAuth(next, result.data), { replace: true });
   };
 
   const registerLink = `/register${next ? `?next=${encodeURIComponent(next)}` : ''}`;
@@ -100,15 +100,14 @@ export function RegisterPage() {
   const { pending, error, run } = useAction();
   const errors = fieldErrors(error);
 
-  if (user) return <Navigate to={next || homeFor(user)} replace />;
+  if (user) return <Navigate to={destinationAfterAuth(next, user)} replace />;
 
   const onSubmit = async (e) => {
     e.preventDefault();
     const result = await run(() => register(form));
     if (!result.ok) return;
-    // Organizer accounts (institute email) go to their dashboard, not a participant page.
-    const target = result.data.role === 'PARTICIPANT' ? next : null;
-    navigate(target || homeFor(result.data), { replace: true });
+    // Institute (@cict.in) sign-ups are organizers, so a participant-only next path falls back to their dashboard.
+    navigate(destinationAfterAuth(next, result.data), { replace: true });
   };
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));

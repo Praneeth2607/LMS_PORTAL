@@ -76,8 +76,8 @@ function NavBar() {
   }, [open]);
 
   const signOut = () => {
+    navigate('/', { replace: true });
     logout();
-    navigate('/');
   };
 
   return (

@@ -9,6 +9,9 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(() => !getToken());
+  // True after the user clicks "Sign out" (as opposed to a session expiring), so
+  // route guards send them home instead of remembering the page they were on.
+  const [signedOut, setSignedOut] = useState(false);
 
   useEffect(() => {
     if (!getToken()) return;
@@ -28,6 +31,7 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (credentials) => {
     const { token, user: loggedIn } = await authService.login(credentials);
     setToken(token);
+    setSignedOut(false);
     setUser(loggedIn);
     return loggedIn;
   }, []);
@@ -35,16 +39,21 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (details) => {
     const { token, user: created } = await authService.register(details);
     setToken(token);
+    setSignedOut(false);
     setUser(created);
     return created;
   }, []);
 
   const logout = useCallback(() => {
     setToken(null);
+    setSignedOut(true);
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, ready, login, register, logout }), [user, ready, login, register, logout]);
+  const value = useMemo(
+    () => ({ user, ready, signedOut, login, register, logout }),
+    [user, ready, signedOut, login, register, logout],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
