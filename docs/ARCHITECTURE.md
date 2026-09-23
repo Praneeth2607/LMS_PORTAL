@@ -1,14 +1,16 @@
 # Architecture
 
-A single React single-page app talks to a single Express REST API backed by one PostgreSQL
-database. No microservices, no caches, no sockets. Deployable as two processes (or one,
-with Express serving the built client).
+The system has three parts: a React single-page app, an Express REST API and one PostgreSQL database.
+There are no microservices, caches or sockets. It runs as two processes (Vite and Node) in development.
 
 ```
 ┌──────────────────────┐   HTTP/JSON (JWT)   ┌─────────────────────────┐   SQL (pg)   ┌────────────┐
 │  client/ (React SPA) │ ──────────────────► │  server/ (Express API)  │ ───────────► │ PostgreSQL │
 │  Vite + Tailwind     │ ◄────────────────── │  /api/*                 │ ◄─────────── │            │
 └──────────────────────┘                     └─────────────────────────┘              └────────────┘
+                                                        │
+                                                        ▼
+                                           server/storage/certificates/*.pdf
 ```
 
 ## Ownership
@@ -19,104 +21,168 @@ with Express serving the built client).
 | `docs/API.md` (the contract) | Backend developer  |
 | `client/`                    | Frontend developer |
 
-The frontend consumes only what `docs/API.md` documents. Contract changes go into `API.md` first.
+The frontend uses only what `docs/API.md` documents. Contract changes go into `API.md` first.
 
-## Backend (`server/src`)
+## Backend (`server/`)
 
-Requests flow in one direction through these layers:
+Each request passes through these layers in order:
 
 ```
-routes → middleware (auth, role, validate) → controllers → services → repositories → db
+routes → middleware (authenticate, authorize) → controllers → services → repositories → db
 ```
 
-| Folder          | Responsibility                                                                     |
-| --------------- | ---------------------------------------------------------------------------------- |
-| `app.js`        | Builds the Express app: CORS, JSON body parser, `/api` router, 404 and error handlers |
-| `server.js`     | Entry point; starts listening                                                      |
-| `config/`       | `env.js` reads every environment variable in one place                             |
-| `db/`           | `pool.js`: the shared `pg` pool and a `query()` helper                             |
-| `routes/`       | One router per feature, all registered in `routes/index.js` under `/api`           |
-| `middleware/`   | Auth (verify JWT), role guard, validation runner, error handler                    |
-| `validators/`   | Plain request-body validation functions per feature                                |
-| `controllers/`  | Read `req`, call a service, send the response envelope. No SQL here.               |
-| `services/`     | Business rules: ownership checks, 90% eligibility, code generation, PDF and QR     |
-| `repositories/` | Parameterized SQL only (`$1, $2`). No business logic.                              |
-| `utils/`        | Small helpers (response helpers, `HttpError`, random codes)                        |
+| Path                       | Responsibility                                                                    |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `src/app.js`               | Builds the Express app: CORS, JSON parser, `/api` router, 404 and error handlers  |
+| `src/server.js`            | Entry point; starts listening                                                     |
+| `src/config/env.js`        | Reads every environment variable in one place                                     |
+| `src/db/pool.js`           | Shared `pg` pool, `query()` and `withTransaction()`; type parsers (DATE → string, NUMERIC/COUNT → number) |
+| `src/db/reset.js`          | `npm run db:reset`: creates the DB if missing, applies schema + seed              |
+| `src/routes/`              | URL → middleware → controller. No logic                                           |
+| `src/middleware/auth.js`   | `authenticate`, `optionalAuthenticate`, `authorize(...roles)`                     |
+| `src/middleware/errorHandler.js` | Error envelope; maps `HttpError`, PostgreSQL constraint errors and bad JSON |
+| `src/validators/`          | `validate(body, schema)`: a small built-in validator (no library). One file per feature |
+| `src/controllers/`         | Parse and validate the request, call a service, send the envelope. No SQL         |
+| `src/services/`            | Business rules: ownership, visibility, capacity, attendance checks, 90% rule, certificates |
+| `src/repositories/`        | Parameterized SQL only. Returns camelCase rows                                    |
+| `src/utils/`               | `HttpError` helpers, response helpers, camelCase mapping, random tokens/codes    |
+| `assets/certificates/`     | Optional `template.pdf` (official CICT design)                                    |
+| `assets/fonts/`            | Optional `name.ttf` / `body.ttf`                                                  |
+| `storage/certificates/`    | Generated PDFs (git-ignored, recreated on demand)                                 |
 
-Conventions:
+### Services
 
-- ES modules everywhere (`"type": "module"`, explicit `.js` extensions in imports).
-- Express 5: async handlers can throw; errors reach `middleware/errorHandler.js` automatically.
-  Throw an `Error` with a `status` property (e.g. 403) to control the response code.
-- Always use parameterized queries. Never build SQL with string concatenation.
-- File names: `<feature>.routes.js`, `<feature>.controller.js`, `<feature>.service.js`, `<feature>.repository.js`, `<feature>.validator.js`.
+| Service                   | Owns                                                                             |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| `auth.service`            | bcrypt hashing, JWT signing/verification, login, sign-up (`@cict.in` emails → ORGANIZER, others → PARTICIPANT; domain set by `ORGANIZER_EMAIL_DOMAIN`) |
+| `workshop.service`        | Workshop CRUD, publish/close rules, **access helpers** used by all other services: `canManage`, `getVisibleWorkshop`, `getManageableWorkshop` |
+| `registration.service`    | Registration with row lock for capacity, form validation, cancel, "my workshops" |
+| `session.service`         | Session CRUD, hides attendance secrets and meeting links from non-authorized viewers |
+| `attendance.service`      | QR/code start/stop/mark, manual marking, **`calculateAttendance()`** (the single place percentage and eligibility are computed) |
+| `certificate.service`     | Eligibility → ID + token → PDF → metadata; access checks; public verification      |
+| `certificatePdf.service`  | pdf-lib rendering from template (or built-in design), fontkit fonts, QR placement |
+| `announcement.service`    | Workshop announcements                                                           |
+| `admin.service`           | Portal statistics, user management                                               |
+
+### Conventions
+
+- ES modules everywhere, with explicit `.js` extensions in imports.
+- Express 5: async handlers can `throw`, and errors reach the error handler automatically. Throw
+  `badRequest()`, `forbidden()`, `notFound()` or `conflict()` from `utils/httpError.js`.
+- Always use parameterized queries (`$1`). Never build SQL by concatenating user input.
+- Roles are checked on the route (`authorize`). **Ownership** (is this organizer the workshop's creator?)
+  is checked in the service, because it needs the database.
+- Drafts return `404` (not `403`) to people who cannot manage them, so their existence isn't revealed.
+
+## Database
+
+See `database/schema.sql`. Tables:
+
+```
+users ─┬─< workshops (created_by)
+       ├─< registrations >── workshops
+       ├─< attendance >───── sessions >── workshops
+       ├─< certificates >─── workshops
+       └─< announcements >── workshops
+workshops ─< registration_fields
+```
+
+Integrity is enforced by the database, not only the code:
+
+- `UNIQUE(workshop_id, participant_id)` on `registrations` and `certificates`.
+- `UNIQUE(session_id, participant_id)` on `attendance`.
+- `UNIQUE` on `users.email`, `certificates.certificate_id` and `certificates.verification_token`.
+- `CHECK` constraints on every enum, and on date and time ordering.
+
+## Key flows
+
+### Authentication
+
+1. `POST /api/auth/login`: `bcrypt.compare` checks the password, then a JWT `{ sub: userId, role }` is signed with `JWT_SECRET` (valid for 1 day).
+2. The client sends `Authorization: Bearer <token>`.
+3. `authenticate` verifies the token **and reloads the user from the database**, so deleted users and role changes take effect immediately.
+
+### Configurable registration
+
+- The organizer defines `registration_fields` (name, type, required, order, and options for SELECT).
+- The client renders the form from `GET /api/workshops/:id` → `registrationFields`.
+- The server validates the answers against those fields, drops unknown keys, and stores them in
+  `registrations.form_data` (JSONB, keyed by `fieldName`).
+- The workshop row is locked (`SELECT … FOR UPDATE`) during registration, so capacity cannot be exceeded under concurrent sign-ups.
+
+### QR attendance
+
+```
+Organizer: POST /sessions/:id/attendance/start
+  → 32-byte random token + 6-char code + expiry saved on the session
+  → URL  FRONTEND_URL/attendance/:id?token=…  → QR data URL (qrcode)
+
+Participant scans → frontend page (logs in if needed)
+  → POST /sessions/:id/attendance/mark { token }   (or { code } typed by hand)
+  → server checks: session exists → attendance open → token/code matches (constant-time compare)
+                   → not expired (DB clock) → registered → not already PRESENT
+  → INSERT … ON CONFLICT upsert into attendance
+```
+
+The QR code only contains a link. Opening the link marks nothing: the logged-in participant's POST is what records attendance.
+Starting attendance again replaces the token, so a photo of an old QR code stops working. Stopping attendance clears both token and code.
+
+### Attendance percentage and the 90% rule
+
+```
+percentage = PRESENT sessions / all sessions of the workshop × 100    (2 decimals)
+eligible   = attended × 100 ≥ threshold × total   (integer math; threshold = 90 by default)
+```
+
+This is computed on every request in `attendance.service.calculateAttendance()` from the live rows. Nothing
+is cached, and nothing is accepted from the client.
+
+### Certificates
+
+`POST /api/workshops/:id/certificates/generate` → for each registered participant:
+
+1. Fetch the workshop's sessions and the participant's attendance.
+2. Calculate the percentage.
+3. Check the 90% rule. Participants below it are listed under `notEligible`.
+4. Skip anyone who already has a certificate (`alreadyIssued`).
+5. Insert a `certificates` row with `certificate_id` `CICT26-XXXXXXXX` and a random `verification_token`.
+   The unique constraint prevents duplicates.
+6. Render the PDF:
+   1. Load `template.pdf`, or draw the built-in design.
+   2. Embed the fonts.
+   3. Write the name, workshop, dates, attendance %, organizer, ID and issue date.
+   4. Generate a QR code for `FRONTEND_URL/verify/<certificateId>?token=<token>` and place it on the page.
+   5. Save it to `storage/certificates/<certificateId>.pdf`.
+7. If the PDF step fails, delete the row, so the participant can be retried.
+
+Downloads regenerate the PDF from the database if the file is missing. That means `storage/` can be wiped safely.
+
+Public verification (`GET /api/certificates/verify/:certificateId`) returns only what is printed on the
+certificate. If the QR code's token is supplied, it must match.
 
 ## Frontend (`client/src`)
 
 | Folder        | Responsibility                                                          |
 | ------------- | ----------------------------------------------------------------------- |
 | `pages/`      | One component per route (grouped by role: `admin/`, `organizer/`, `participant/`, `public/`) |
-| `layouts/`    | Shells with navigation per role (e.g. `DashboardLayout`)                |
-| `components/` | Reusable UI (buttons, cards, tables, modals, form fields)               |
+| `layouts/`    | Shells with navigation per role                                         |
+| `components/` | Reusable UI                                                             |
 | `services/`   | `api.js` fetch wrapper + one file per feature calling the API           |
-| `context/`    | `AuthContext` (current user, token, login/logout). React context only, no state library. |
-| `hooks/`      | Custom hooks (`useAuth`, `useFetch`, …)                                  |
-| `utils/`      | Formatting helpers (dates, percentages)                                 |
+| `context/`    | `AuthContext` (current user, token, login/logout). React context only   |
+| `hooks/`      | Custom hooks                                                            |
+| `utils/`      | Formatting helpers                                                      |
 | `assets/`     | Images and fonts bundled by Vite                                        |
 
-Routing uses `react-router-dom`. Protected routes check the role from `AuthContext`.
-Styling uses Tailwind CSS v4 utility classes only (`@import "tailwindcss"` in `index.css`).
-
-## Key flows
-
-### Authentication
-
-1. `POST /api/auth/login` checks the password with `bcrypt.compare` and returns a JWT with `{ id, role }`.
-2. The client stores the token in `localStorage` and sends `Authorization: Bearer <token>`.
-3. The auth middleware verifies the token and sets `req.user`; the role middleware checks `req.user.role`.
-
-### Workshop lifecycle
-
-`draft` → `published` (visible and open for registration) → `completed` (certificates can be issued).
-Any non-completed workshop can go to `cancelled`.
-
-### Configurable registration
-
-`workshops.registration_fields` (JSONB) holds extra form fields defined by the organizer.
-The client renders them dynamically; answers are stored in `registrations.form_responses`.
-If `requires_approval` is true, new registrations start as `pending`. Capacity and deadline are
-enforced on register.
-
-### QR / code attendance
-
-1. The organizer opens attendance for a session. The server generates a short random
-   `attendance_code` (with an optional expiry) and returns it along with a QR image
-   (`qrcode` → data URL) that encodes the code.
-2. Participants scan the QR or type the code. `POST /api/attendance/mark` checks that the session
-   is open, the code matches and has not expired, and the user has an approved registration.
-3. The unique `(session_id, user_id)` constraint prevents double marking.
-
-### Attendance percentage and the 90% rule
-
-The `workshop_attendance_summary` view computes, per approved registration:
-
-```
-attendance_percentage = attended_sessions / total_sessions × 100
-certificate_eligible  = attendance_percentage ≥ workshops.certificate_threshold   (default 90)
-```
-
-Nothing is stored, so the percentage is always current.
-
-### Certificates
-
-1. The organizer issues certificates for a completed workshop. Every eligible participant gets a
-   `certificates` row with an unguessable `certificate_code`.
-2. The PDF is generated on demand with `pdf-lib` (+ `@pdf-lib/fontkit` for custom fonts) and
-   includes a QR (`qrcode`) pointing to `PUBLIC_VERIFY_URL/<certificate_code>`.
-3. The public verify page calls `GET /api/certificates/verify/:code` and shows name, workshop,
-   date and validity (revoked certificates show as invalid).
+The routes `/attendance/:sessionId` and `/verify/:certificateId` are required, because the QR codes point to them (see API.md).
 
 ## Environment
 
-- `server/.env` (copy from `server/.env.example`): port, CORS origin, PostgreSQL connection, JWT, threshold.
-- `client/.env` (copy from `client/.env.example`): `VITE_API_BASE_URL`, empty in development.
+- `server/.env` (copy from `server/.env.example`) sets:
+  - `PORT` and `FRONTEND_URL` (used for CORS and the QR URLs);
+  - the database connection: either `DATABASE_URL` (the shared Supabase database, with `PGSSL=true`)
+    or the individual `PG*` values for a local Postgres;
+  - `ORGANIZER_EMAIL_DOMAIN` (default `cict.in`);
+  - `JWT_SECRET`;
+  - the attendance window;
+  - the certificate threshold.
+- `client/.env` (copy from `client/.env.example`) sets `VITE_API_BASE_URL`. Leave it empty in development.

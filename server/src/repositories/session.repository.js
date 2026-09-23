@@ -1,0 +1,86 @@
+import { query } from '../db/pool.js';
+import { camelize, camelizeRows } from '../utils/case.js';
+import { buildSetClause } from '../utils/sql.js';
+
+const COLUMNS = {
+  title: 'title',
+  sessionDate: 'session_date',
+  startTime: 'start_time',
+  endTime: 'end_time',
+  meetingLink: 'meeting_link',
+};
+
+// attendance_open = started AND not yet expired (computed with the DB clock).
+const SESSION_COLUMNS = `
+  s.id, s.workshop_id, s.title, s.session_date,
+  to_char(s.start_time, 'HH24:MI') AS start_time,
+  to_char(s.end_time, 'HH24:MI') AS end_time,
+  s.meeting_link, s.attendance_token, s.attendance_code, s.attendance_expires_at,
+  (s.attendance_active AND s.attendance_expires_at > NOW()) AS attendance_open,
+  s.created_at, s.updated_at`;
+
+export async function findById(id) {
+  const { rows } = await query(
+    `SELECT ${SESSION_COLUMNS}, w.title AS workshop_title
+     FROM sessions s
+     JOIN workshops w ON w.id = s.workshop_id
+     WHERE s.id = $1`,
+    [id],
+  );
+  return camelize(rows[0]);
+}
+
+// participantId (optional) adds my_attendance_status for that participant.
+export async function listByWorkshop(workshopId, participantId = null) {
+  const { rows } = await query(
+    `SELECT ${SESSION_COLUMNS}, a.status AS my_attendance_status
+     FROM sessions s
+     LEFT JOIN attendance a ON a.session_id = s.id AND a.participant_id = $2
+     WHERE s.workshop_id = $1
+     ORDER BY s.session_date, s.start_time, s.id`,
+    [workshopId, participantId],
+  );
+  return camelizeRows(rows);
+}
+
+export async function create(workshopId, data) {
+  const { rows } = await query(
+    `INSERT INTO sessions (workshop_id, title, session_date, start_time, end_time, meeting_link)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id`,
+    [workshopId, data.title, data.sessionDate, data.startTime, data.endTime, data.meetingLink ?? null],
+  );
+  return rows[0].id;
+}
+
+export async function update(id, data) {
+  const { sets, values } = buildSetClause(data, COLUMNS, 2);
+  if (!sets) return;
+  await query(`UPDATE sessions SET ${sets} WHERE id = $1`, [id, ...values]);
+}
+
+export async function remove(id) {
+  await query('DELETE FROM sessions WHERE id = $1', [id]);
+}
+
+export async function startAttendance(id, { token, code, minutes }) {
+  const { rows } = await query(
+    `UPDATE sessions
+     SET attendance_token = $2, attendance_code = $3, attendance_active = TRUE,
+         attendance_expires_at = NOW() + make_interval(mins => $4)
+     WHERE id = $1
+     RETURNING attendance_expires_at`,
+    [id, token, code, minutes],
+  );
+  return rows[0].attendance_expires_at;
+}
+
+export async function stopAttendance(id) {
+  await query(
+    `UPDATE sessions
+     SET attendance_active = FALSE, attendance_token = NULL, attendance_code = NULL,
+         attendance_expires_at = NULL
+     WHERE id = $1`,
+    [id],
+  );
+}

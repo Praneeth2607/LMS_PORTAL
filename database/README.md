@@ -2,54 +2,79 @@
 
 PostgreSQL 14+. Owned by the backend developer.
 
-| File         | Purpose                                                            |
-| ------------ | ------------------------------------------------------------------ |
-| `schema.sql` | Drops and recreates all tables, triggers and the attendance view   |
-| `seed.sql`   | Demo users, workshops, sessions, registrations, announcements      |
+| File         | Purpose                                                    |
+| ------------ | ---------------------------------------------------------- |
+| `schema.sql` | Drops and recreates all tables, constraints and triggers   |
+| `seed.sql`   | Demo users, workshops, form fields, registrations, sessions, attendance, announcements |
 
 ## Setup
 
+Set the `PG*` values in `server/.env`, then from the repo root:
+
 ```bash
-# 1. Create the database (once)
+npm run db:reset             # creates the database if missing, applies schema.sql + seed.sql
+npm run db:reset -- --no-seed  # schema only
+```
+
+This **deletes all data** every time it runs. It uses Node, so `psql` does not need to be on your PATH.
+
+> **Shared Supabase database:** when `DATABASE_URL` is set, `db:reset` runs against Supabase and wipes the
+> database that everyone is using. Tell the team before running it. For Supabase, `PGSSL` must be `true`.
+
+If you prefer `psql`:
+
+```bash
 createdb -U postgres aurex26
-#    or: psql -U postgres -c "CREATE DATABASE aurex26;"
-
-# 2. Create tables (re-run any time to reset; this DELETES all data)
 psql -U postgres -d aurex26 -f database/schema.sql
-
-# 3. Load demo data
 psql -U postgres -d aurex26 -f database/seed.sql
 ```
 
-Then set the `PG*` values in `server/.env` to match.
-
 ## Demo accounts
 
-Password for all: `Password@123`
+Password for all: **`Password@123`**
 
-| Email                     | Role        |
-| ------------------------- | ----------- |
-| `admin@aurex26.dev`       | admin       |
-| `organizer@aurex26.dev`   | organizer   |
-| `participant@aurex26.dev` | participant |
-| `sam@aurex26.dev`         | participant |
+| Email                 | Role        | Demo purpose                                                   |
+| --------------------- | ----------- | -------------------------------------------------------------- |
+| `admin@aurex26.dev`   | ADMIN       | Stats, user management, can manage every workshop              |
+| `meera@aurex26.dev`   | ORGANIZER   | Owns Full-Stack (closed, certificates) and Cybersecurity       |
+| `arjun@aurex26.dev`   | ORGANIZER   | Owns ML (live QR demo, session today) and Cloud/DevOps (draft) |
+| `priya@aurex26.dev`   | PARTICIPANT | Full-Stack **100%**, eligible                                  |
+| `rahul@aurex26.dev`   | PARTICIPANT | Full-Stack **90%** (exactly at the threshold), eligible        |
+| `ananya@aurex26.dev`  | PARTICIPANT | Full-Stack **70%**, not eligible                               |
+| `karthik@aurex26.dev` | PARTICIPANT | Full-Stack **50%**, not eligible                               |
+| `sneha@aurex26.dev`   | PARTICIPANT | Registered for ML and Cybersecurity                            |
+| `vikram@aurex26.dev`  | PARTICIPANT | Not registered anywhere, for the live registration demo        |
+
+## Seeded workshops
+
+All dates are relative to the day you run the seed, so the demo always looks current.
+
+| Workshop                                   | Status    | Mode    | Sessions                      | Notes                                   |
+| ------------------------------------------ | --------- | ------- | ----------------------------- | --------------------------------------- |
+| Full-Stack Web Development with React & Node.js | CLOSED | HYBRID | 10, all in the past, attendance recorded | Generate certificates: 2 eligible, 2 not |
+| Machine Learning Fundamentals with Python  | PUBLISHED | OFFLINE | 4; the first is **today**     | Start attendance and scan the QR live   |
+| Cybersecurity Essentials                   | PUBLISHED | ONLINE  | 2, upcoming                   | Meeting link hidden until registered    |
+| Cloud & DevOps Bootcamp                    | DRAFT     | OFFLINE | none                          | Visible only to Arjun and the admin     |
+
+No certificates are seeded; generate them live during the demo.
 
 ## Tables
 
-| Table           | Holds                                                                    |
-| --------------- | ------------------------------------------------------------------------ |
-| `users`         | Everyone. `role` is `admin`, `organizer` or `participant`                |
-| `workshops`     | Workshop details, venue/meeting link, configurable `registration_fields`, status, threshold |
-| `registrations` | Participant ↔ workshop, with `status` and `form_responses`               |
-| `sessions`      | Sessions of a workshop, plus the current `attendance_code`               |
-| `attendance`    | One row per participant per attended session                             |
-| `certificates`  | Issued certificates with a public `certificate_code` for QR verification |
-| `announcements` | Workshop announcements (`workshop_id` NULL = portal-wide)                |
+| Table                 | Holds                                                                    |
+| --------------------- | ------------------------------------------------------------------------ |
+| `users`               | Everyone. `role` is `ADMIN`, `ORGANIZER` or `PARTICIPANT`; email is unique and lowercase |
+| `workshops`           | Details, dates, mode, venue, meeting link, capacity, `status` (`DRAFT`/`PUBLISHED`/`CLOSED`), `created_by` |
+| `registration_fields` | Per-workshop form fields (`field_name`, `field_type`, `required`, `field_order`, `options`) |
+| `registrations`       | Participant ↔ workshop, answers in `form_data` (JSONB), `UNIQUE(workshop_id, participant_id)` |
+| `sessions`            | Date and time, meeting link, and the current `attendance_token` / `attendance_code` / expiry |
+| `attendance`          | `PRESENT`/`ABSENT` per session and participant, `method` (`QR`/`CODE`/`MANUAL`), `UNIQUE(session_id, participant_id)` |
+| `certificates`        | `certificate_id` (public, unique), `verification_token`, attendance % at issue time |
+| `announcements`       | Workshop announcements                                                   |
 
-View `workshop_attendance_summary` gives `attendance_percentage` and `certificate_eligible`
-(≥ `workshops.certificate_threshold`, default 90) for each approved registration.
+The attendance percentage is **not stored**. The API calculates it from `sessions` and `attendance` on every request
+(`server/src/services/attendance.service.js`).
 
 ## Changing the schema
 
-Edit `schema.sql` (and `seed.sql` if needed), re-run both, and note any change that affects
-API responses in `docs/API.md`. There are no migrations; for a 24-hour build, resetting is simpler.
+Edit `schema.sql` (and `seed.sql` if needed), then run `npm run db:reset`. If the change affects API
+responses, update `docs/API.md` in the same commit. There are no migrations; for a 24-hour build, resetting is simpler.
