@@ -110,6 +110,19 @@ Integrity is enforced by the database, not only the code:
   `registrations.form_data` (JSONB, keyed by `fieldName`).
 - The workshop row is locked (`SELECT … FOR UPDATE`) during registration, so capacity cannot be exceeded under concurrent sign-ups.
 
+### Session lifecycle
+
+```
+SCHEDULED ──(start time reached)──► READY ──(organizer presses Start)──► ONGOING ──(end time)──► COMPLETED
+```
+
+- The status is calculated in SQL on every read, from `session_date` + `start_time`/`end_time` interpreted in
+  `APP_TIMEZONE` (default Asia/Kolkata; Supabase itself runs in UTC) and `sessions.started_at`.
+- `POST /api/sessions/:id/start` sets `started_at`. It is rejected before the start time and after the end time.
+- The UI switches the Start button on by itself at `startsAt`, using a 15-second clock, so no reload is needed.
+  For online and hybrid workshops it opens the meeting link; for offline ones it only marks the session Ongoing.
+- Rescheduling a session clears `started_at`.
+
 ### QR attendance
 
 ```

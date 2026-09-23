@@ -14,6 +14,7 @@ import {
   modeLabel,
   registrationState,
   seatsLabel,
+  sessionLiveStatus,
 } from '../utils/format.js';
 
 // ---------------------------------------------------------------- Catalogue card
@@ -86,6 +87,7 @@ export function SessionList({ sessions, participantView = false }) {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {sessionLiveStatus(session) === 'ONGOING' && <StatusBadge status="ONGOING" />}
             {session.attendanceOpen && <StatusBadge status="OPEN" />}
             {participantView && (
               <StatusBadge status={session.myAttendanceStatus || (sessionPast(session) ? 'NOT_MARKED' : 'UPCOMING')} />

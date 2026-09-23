@@ -1,3 +1,4 @@
+import env from '../config/env.js';
 import { query } from '../db/pool.js';
 import { camelize, camelizeRows } from '../utils/case.js';
 import { buildSetClause } from '../utils/sql.js';
@@ -10,22 +11,37 @@ const COLUMNS = {
   meetingLink: 'meeting_link',
 };
 
-// attendance_open = started AND not yet expired (computed with the DB clock).
-const SESSION_COLUMNS = `
+// Session date + time are local wall-clock values in env.appTimezone; `tz` is the
+// placeholder (e.g. '$2') holding that timezone. All time checks use the DB clock.
+//   attendance_open: QR/code check-in started and not yet expired
+//   status: SCHEDULED → READY (start time reached) → ONGOING (organizer pressed Start)
+//           → COMPLETED (end time passed)
+const sessionColumns = (tz) => {
+  const startsAt = `((s.session_date + s.start_time) AT TIME ZONE ${tz})`;
+  const endsAt = `((s.session_date + s.end_time) AT TIME ZONE ${tz})`;
+  return `
   s.id, s.workshop_id, s.title, s.session_date,
   to_char(s.start_time, 'HH24:MI') AS start_time,
   to_char(s.end_time, 'HH24:MI') AS end_time,
+  ${startsAt} AS starts_at, ${endsAt} AS ends_at, s.started_at,
+  CASE
+    WHEN NOW() >= ${endsAt} THEN 'COMPLETED'
+    WHEN s.started_at IS NOT NULL THEN 'ONGOING'
+    WHEN NOW() >= ${startsAt} THEN 'READY'
+    ELSE 'SCHEDULED'
+  END AS status,
   s.meeting_link, s.attendance_token, s.attendance_code, s.attendance_expires_at,
   (s.attendance_active AND s.attendance_expires_at > NOW()) AS attendance_open,
   s.created_at, s.updated_at`;
+};
 
 export async function findById(id) {
   const { rows } = await query(
-    `SELECT ${SESSION_COLUMNS}, w.title AS workshop_title
+    `SELECT ${sessionColumns('$2')}, w.title AS workshop_title
      FROM sessions s
      JOIN workshops w ON w.id = s.workshop_id
      WHERE s.id = $1`,
-    [id],
+    [id, env.appTimezone],
   );
   return camelize(rows[0]);
 }
@@ -33,12 +49,12 @@ export async function findById(id) {
 // participantId (optional) adds my_attendance_status for that participant.
 export async function listByWorkshop(workshopId, participantId = null) {
   const { rows } = await query(
-    `SELECT ${SESSION_COLUMNS}, a.status AS my_attendance_status
+    `SELECT ${sessionColumns('$3')}, a.status AS my_attendance_status
      FROM sessions s
      LEFT JOIN attendance a ON a.session_id = s.id AND a.participant_id = $2
      WHERE s.workshop_id = $1
      ORDER BY s.session_date, s.start_time, s.id`,
-    [workshopId, participantId],
+    [workshopId, participantId, env.appTimezone],
   );
   return camelizeRows(rows);
 }
@@ -56,7 +72,17 @@ export async function create(workshopId, data) {
 export async function update(id, data) {
   const { sets, values } = buildSetClause(data, COLUMNS, 2);
   if (!sets) return;
-  await query(`UPDATE sessions SET ${sets} WHERE id = $1`, [id, ...values]);
+  // Rescheduling a session clears its "started" state.
+  const rescheduled = ['sessionDate', 'startTime', 'endTime'].some((f) => data[f] !== undefined);
+  await query(
+    `UPDATE sessions SET ${sets}${rescheduled ? ', started_at = NULL' : ''} WHERE id = $1`,
+    [id, ...values],
+  );
+}
+
+// Marks the session as started (idempotent: keeps the first start time).
+export async function markStarted(id) {
+  await query('UPDATE sessions SET started_at = COALESCE(started_at, NOW()) WHERE id = $1', [id]);
 }
 
 export async function remove(id) {

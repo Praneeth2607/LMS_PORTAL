@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useAction, useDocumentTitle, useInterval, useNow } from '../../hooks/useUtils.js';
-import { createSession, deleteSession, listSessions, updateSession } from '../../services/sessionService.js';
+import { createSession, deleteSession, listSessions, startSession, updateSession } from '../../services/sessionService.js';
 import { getAttendanceGrid, startAttendance, stopAttendance } from '../../services/attendanceService.js';
 import { EmptyState, ErrorState, LoadingBlock, Notice, SectionHeader, Spinner, StatusBadge } from '../../components/ui.jsx';
 import { SelectField, TextField, fieldErrors } from '../../components/Form.jsx';
 import Modal from '../../components/Modal.jsx';
 import Icon from '../../components/Icon.jsx';
-import { formatCountdown, formatDate, formatDateTime, formatTime } from '../../utils/format.js';
+import { formatCountdown, formatDate, formatDateTime, formatTime, sessionLiveStatus } from '../../utils/format.js';
 
 // ---------------------------------------------------------------- Session form
 function SessionForm({ workshop, initial, onSaved, onCancel }) {
@@ -223,16 +223,48 @@ function AttendanceModal({ session, workshop, onClose, onChanged }) {
   );
 }
 
+// ---------------------------------------------------------------- Start / join control
+// status is the live lifecycle (see sessionLiveStatus). The server enforces the
+// same rules when the button is pressed.
+function SessionStartControl({ session, status, online, draft, starting, onStart }) {
+  const link = online ? session.meetingLink : null;
+  if (status === 'COMPLETED') return null;
+  if (status === 'ONGOING') {
+    return link ? (
+      <a href={link} target="_blank" rel="noreferrer" className="btn btn-primary">
+        <Icon name="video" size={18} /> Join meeting<span className="sr-only"> (opens in a new tab)</span>
+      </a>
+    ) : null;
+  }
+  const locked = status === 'SCHEDULED' || draft;
+  return (
+    <button
+      type="button"
+      className="btn btn-primary"
+      disabled={locked || starting}
+      onClick={onStart}
+      title={draft ? 'Publish the workshop first' : locked ? `Available from ${formatTime(session.startTime)}` : undefined}
+    >
+      {starting ? <Spinner /> : <Icon name={link ? 'video' : 'arrowRight'} size={18} />}
+      {link ? 'Start & join meeting' : 'Start session'}
+    </button>
+  );
+}
+
 // ---------------------------------------------------------------- Page
 export default function SessionsPage() {
   const { workshop, reloadWorkshop } = useOutletContext();
   useDocumentTitle(`Sessions · ${workshop.title}`);
-  const { data: sessions, error, loading, reload } = useAsync(() => listSessions(workshop.id), [workshop.id]);
+  const { data: sessions, error, loading, reload, setData } = useAsync(() => listSessions(workshop.id), [workshop.id]);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [attendanceFor, setAttendanceFor] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [startingId, setStartingId] = useState(null);
   const action = useAction();
+  // Re-render every 15s so "Start session" unlocks when a session's time arrives.
+  const now = useNow(15000);
+  const isOnline = workshop.mode !== 'OFFLINE';
 
   const refresh = () => {
     reload({ silent: true });
@@ -245,6 +277,34 @@ export default function SessionsPage() {
       setNotice(`Attendance stopped for "${session.title}". ${result.data.presentCount} present.`);
       reload({ silent: true });
     }
+  };
+
+  // Online/hybrid: open the meeting link. The tab is opened synchronously (inside
+  // the click) so popup blockers allow it, then pointed at the link once the
+  // backend confirms the start; it is closed again if the start is rejected.
+  const onStart = async (session) => {
+    const link = isOnline ? session.meetingLink : null;
+    const tab = link ? window.open('', '_blank') : null;
+    setStartingId(session.id);
+    const result = await action.run(() => startSession(session.id));
+    setStartingId(null);
+    if (!result.ok) {
+      tab?.close();
+      return;
+    }
+    // Show "Ongoing" immediately from the response; the reload below re-syncs the list.
+    setData((list) => list.map((s) => (s.id === session.id ? result.data : s)));
+    if (link) {
+      const url = result.data.meetingLink || link;
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = url;
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+    }
+    setNotice(`"${session.title}" is now ongoing.${link ? ' The meeting opened in a new tab.' : ''}`);
+    reload({ silent: true });
   };
 
   const onDelete = async (session) => {
@@ -345,7 +405,15 @@ export default function SessionsPage() {
                   </div>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[18px] font-medium">{session.title}</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="text-[18px] font-medium">{session.title}</p>
+                    <StatusBadge status={sessionLiveStatus(session, now)} />
+                  </div>
+                  {sessionLiveStatus(session, now) === 'SCHEDULED' && (
+                    <p className="mt-1 text-[14px] text-slate">
+                      You can start this session at {formatTime(session.startTime)} on {formatDate(session.sessionDate)}.
+                    </p>
+                  )}
                   {session.attendanceOpen && (
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-[15px] text-charcoal">
                       <StatusBadge status="OPEN" />
@@ -355,9 +423,17 @@ export default function SessionsPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <SessionStartControl
+                    session={session}
+                    status={sessionLiveStatus(session, now)}
+                    online={isOnline}
+                    draft={workshop.status === 'DRAFT'}
+                    starting={startingId === session.id}
+                    onStart={() => onStart(session)}
+                  />
                   {session.attendanceOpen ? (
                     <>
-                      <button type="button" className="btn btn-primary" onClick={() => setAttendanceFor(session)}>
+                      <button type="button" className="btn btn-secondary" onClick={() => setAttendanceFor(session)}>
                         <Icon name="qr" size={18} /> New QR
                       </button>
                       <button type="button" className="btn btn-secondary" disabled={action.pending} onClick={() => onStopFromRow(session)}>
@@ -367,7 +443,7 @@ export default function SessionsPage() {
                   ) : (
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn btn-secondary"
                       disabled={workshop.status === 'DRAFT'}
                       onClick={() => setAttendanceFor(session)}
                     >

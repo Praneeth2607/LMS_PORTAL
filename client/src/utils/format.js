@@ -65,6 +65,17 @@ export const sessionStart = (s) => new Date(`${s.sessionDate}T${s.startTime}:00`
 export const sessionEnd = (s) => new Date(`${s.sessionDate}T${s.endTime}:00`);
 export const isSessionUpcoming = (s, now = new Date()) => sessionEnd(s) >= now;
 
+// Session lifecycle as of `now`, from the backend's startsAt/endsAt/startedAt.
+// Mirrors the server's `status` so buttons unlock on time without a reload;
+// the server still validates every start request.
+export function sessionLiveStatus(session, now = Date.now()) {
+  if (!session.startsAt) return session.status;
+  if (now >= new Date(session.endsAt).getTime()) return 'COMPLETED';
+  if (session.startedAt) return 'ONGOING';
+  if (now >= new Date(session.startsAt).getTime()) return 'READY';
+  return 'SCHEDULED';
+}
+
 export function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

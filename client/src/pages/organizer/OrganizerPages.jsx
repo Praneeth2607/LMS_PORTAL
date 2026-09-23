@@ -41,6 +41,7 @@ import {
   formatTime,
   isSessionUpcoming,
   modeLabel,
+  sessionLiveStatus,
   sessionStart,
 } from '../../utils/format.js';
 import { manageWorkshopPath } from '../../utils/roles.js';
@@ -120,9 +121,10 @@ export function OrganizerDashboard() {
                         {formatTime(s.startTime)} – {formatTime(s.endTime)}
                       </p>
                     </div>
+                    <StatusBadge status={sessionLiveStatus(s)} />
                     {s.attendanceOpen && <StatusBadge status="OPEN" />}
                     <Link to={manageWorkshopPath(s.workshopId, 'sessions')} className="btn btn-secondary">
-                      Take attendance
+                      Manage session
                     </Link>
                   </li>
                 ))}

@@ -21,6 +21,10 @@ export async function update(req, res) {
   sendSuccess(res, session, 'Session updated');
 }
 
+export async function start(req, res) {
+  sendSuccess(res, await sessionService.startSession(parseId(req.params.id), req.user), 'Session started');
+}
+
 export async function remove(req, res) {
   await sessionService.deleteSession(parseId(req.params.id), req.user);
   sendSuccess(res, null, 'Session deleted');

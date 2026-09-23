@@ -1,5 +1,5 @@
 import * as sessionRepository from '../repositories/session.repository.js';
-import { badRequest, notFound } from '../utils/httpError.js';
+import { badRequest, conflict, notFound } from '../utils/httpError.js';
 import { canManage, canSeeMeetingLink, getManageableWorkshop, getVisibleWorkshop } from './workshop.service.js';
 
 // Hides the attendance secrets from everyone except the workshop managers, and
@@ -65,6 +65,20 @@ export async function updateSession(sessionId, data, user) {
   }
   assertSessionFits({ ...session, ...data }, workshop);
   await sessionRepository.update(sessionId, data);
+  return getSession(sessionId, user);
+}
+
+// POST /api/sessions/:id/start: the organizer starts the session once its
+// scheduled start time has arrived (server clock + APP_TIMEZONE). Idempotent
+// while the session is ONGOING, so the organizer can reopen the meeting link.
+export async function startSession(sessionId, user) {
+  const { session, workshop } = await getSessionContext(sessionId, user, { manage: true });
+  if (workshop.status === 'DRAFT') throw conflict('Publish the workshop before starting its sessions');
+  if (session.status === 'SCHEDULED') {
+    throw conflict(`This session can be started from ${session.startTime} on ${session.sessionDate}`);
+  }
+  if (session.status === 'COMPLETED') throw conflict('This session has already ended');
+  if (session.status === 'READY') await sessionRepository.markStarted(session.id);
   return getSession(sessionId, user);
 }
 

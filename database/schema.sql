@@ -110,6 +110,7 @@ CREATE TABLE sessions (
   attendance_code        VARCHAR(8),
   attendance_active      BOOLEAN      NOT NULL DEFAULT FALSE,
   attendance_expires_at  TIMESTAMPTZ,
+  started_at             TIMESTAMPTZ,  -- set when the organizer presses "Start session"
   created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   CHECK (end_time > start_time)
