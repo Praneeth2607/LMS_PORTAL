@@ -9,7 +9,7 @@
 
 BEGIN;
 
-DROP TABLE IF EXISTS certificates, announcements, attendance, sessions,
+DROP TABLE IF EXISTS blocked_emails, certificates, announcements, attendance, sessions,
                      registrations, registration_fields, workshops, users CASCADE;
 
 -- Keeps updated_at current on UPDATE.
@@ -30,8 +30,19 @@ CREATE TABLE users (
   password_hash  TEXT         NOT NULL,
   role           VARCHAR(20)  NOT NULL DEFAULT 'PARTICIPANT'
                    CHECK (role IN ('ADMIN', 'ORGANIZER', 'PARTICIPANT')),
+  suspended_at   TIMESTAMPTZ,  -- set by an admin; suspended users cannot sign in
   created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------
+-- blocked_emails: emails of suspended users that an admin deleted. Self
+-- sign-up with them is refused; only an admin can create the account again.
+-- ---------------------------------------------------------------------
+CREATE TABLE blocked_emails (
+  email       VARCHAR(255) PRIMARY KEY CHECK (email = LOWER(email)),
+  blocked_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  blocked_by  INTEGER      REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ---------------------------------------------------------------------

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import { Badge, DateDisc, Notice, StatusBadge, Spinner, ProgressBar } from './ui.jsx';
-import { useAction } from '../hooks/useUtils.js';
+import { useAction, useNow } from '../hooks/useUtils.js';
 import { downloadCertificate, previewCertificate, verificationPath } from '../services/certificateService.js';
 import {
   formatDate,
@@ -74,7 +74,7 @@ export function SessionList({ sessions, participantView = false }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[18px] font-medium tracking-[-0.01em]">{session.title}</p>
-            {session.meetingLink && (
+            {session.meetingLink && !participantView && (
               <a
                 href={session.meetingLink}
                 target="_blank"
@@ -92,6 +92,7 @@ export function SessionList({ sessions, participantView = false }) {
             {participantView && (
               <StatusBadge status={session.myAttendanceStatus || (sessionPast(session) ? 'NOT_MARKED' : 'UPCOMING')} />
             )}
+            {participantView && <JoinButton session={session} />}
             {participantView && session.attendanceOpen && session.myAttendanceStatus !== 'PRESENT' && (
               <Link to={`/attendance/${session.id}`} className="btn btn-primary">
                 Mark attendance
@@ -105,6 +106,29 @@ export function SessionList({ sessions, participantView = false }) {
 }
 
 const sessionPast = (s) => new Date(`${s.sessionDate}T${s.endTime}:00`) < new Date();
+
+// ---------------------------------------------------------------- Join (participant)
+// For sessions with a meeting link: enabled from the scheduled start time until
+// the session ends. Re-checks the clock every 15s, so it unlocks without a reload.
+export function JoinButton({ session }) {
+  const now = useNow(15000);
+  if (!session.meetingLink) return null;
+  const status = sessionLiveStatus(session, now);
+  if (status === 'COMPLETED') return null;
+  if (status === 'SCHEDULED') {
+    return (
+      <button type="button" className="btn btn-secondary" disabled>
+        <Icon name="clock" size={18} /> Join at {formatTime(session.startTime)}
+      </button>
+    );
+  }
+  return (
+    <a href={session.meetingLink} target="_blank" rel="noreferrer" className="btn btn-primary">
+      <Icon name="video" size={18} /> Join session
+      <span className="sr-only"> {session.title} (opens in a new tab)</span>
+    </a>
+  );
+}
 
 // ---------------------------------------------------------------- Announcements
 export function AnnouncementList({ announcements, showWorkshop = false }) {
@@ -138,16 +162,19 @@ export function AttendanceSummary({ attendance }) {
   return (
     <div>
       <div className="flex items-end justify-between gap-4">
-        <p className="text-[48px] font-medium leading-none tracking-[-0.03em]">{formatPercent(attendance.percentage)}</p>
+        <p className="text-[48px] font-medium leading-none tracking-[-0.03em]">
+          {attendance.completedSessions > 0 ? formatPercent(attendance.percentage) : '–'}
+        </p>
         <p className="pb-1 text-right text-[15px] text-slate">
-          {attendance.attendedSessions} of {attendance.totalSessions} sessions attended
+          {attendance.attendedSessions} of {attendance.completedSessions} completed sessions attended
+          <span className="block">{attendance.totalSessions} sessions in this workshop</span>
         </p>
       </div>
       <div className="mt-5">
         <ProgressBar value={attendance.percentage} marker={attendance.threshold} label="Attendance" />
       </div>
       <p className="mt-3 text-[14px] text-slate">
-        Certificates need at least {attendance.threshold}% attendance.
+        Based on completed sessions. Certificates need at least {attendance.threshold}% attendance.
       </p>
     </div>
   );
@@ -179,6 +206,14 @@ export function CertificateStatus({ entry }) {
       </div>
     );
   }
+  if (attendance.completedSessions === 0) {
+    return (
+      <div>
+        <StatusBadge status="PENDING" />
+        <p className="mt-4 text-charcoal">Your attendance will count once the first session has ended.</p>
+      </div>
+    );
+  }
   if (attendance.eligible) {
     return (
       <div>
@@ -194,8 +229,8 @@ export function CertificateStatus({ entry }) {
       <StatusBadge status="NOT_ELIGIBLE" />
       <p className="mt-4 font-medium">Not eligible for certificate</p>
       <p className="mt-1 text-charcoal">
-        {attendance.attendedSessions} of {attendance.totalSessions} sessions attended ({formatPercent(attendance.percentage)}).
-        At least {attendance.threshold}% is required.
+        {attendance.attendedSessions} of {attendance.completedSessions} completed sessions attended (
+        {formatPercent(attendance.percentage)}). At least {attendance.threshold}% is required.
       </p>
     </div>
   );

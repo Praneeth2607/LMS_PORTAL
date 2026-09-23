@@ -1,4 +1,4 @@
-import { verifyToken } from '../services/auth.service.js';
+import { SUSPENDED_MESSAGE, verifyToken } from '../services/auth.service.js';
 import * as userRepository from '../repositories/user.repository.js';
 import { forbidden, unauthorized } from '../utils/httpError.js';
 
@@ -17,6 +17,8 @@ async function resolveUser(req) {
   // Load from the DB so deleted users and role changes take effect immediately.
   const user = await userRepository.findById(payload.sub);
   if (!user) throw unauthorized('Account no longer exists');
+  // 401 so the client drops the token: a suspension takes effect immediately.
+  if (user.suspendedAt) throw unauthorized(SUSPENDED_MESSAGE);
   return user;
 }
 

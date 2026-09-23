@@ -1,7 +1,7 @@
 import { unlink } from 'node:fs/promises';
 import env from '../config/env.js';
 import * as certificateRepository from '../repositories/certificate.repository.js';
-import * as sessionRepository from '../repositories/session.repository.js';
+import * as attendanceRepository from '../repositories/attendance.repository.js';
 import { getWorkshopSummary } from './attendance.service.js';
 import { certificatePath, ensureCertificatePdf, generateCertificatePdf, saveCertificatePdf } from './certificatePdf.service.js';
 import { canManage, getManageableWorkshop } from './workshop.service.js';
@@ -71,11 +71,18 @@ export async function generateForWorkshop(workshopId, user) {
   const workshop = await getManageableWorkshop(workshopId, user);
   if (workshop.status === 'DRAFT') throw conflict('Certificates cannot be generated for a draft workshop');
 
-  const sessions = await sessionRepository.listByWorkshop(workshopId);
-  if (sessions.length === 0) throw conflict('This workshop has no sessions, so attendance cannot be calculated');
+  const { totalSessions, completedSessions } = await attendanceRepository.sessionCounts(workshopId);
+  if (totalSessions === 0) throw conflict('This workshop has no sessions, so attendance cannot be calculated');
+  // Attendance % is based on completed sessions, so certificates wait until every
+  // session has finished (otherwise 1 of 1 completed sessions would already be 100%).
+  if (completedSessions < totalSessions) {
+    throw conflict(
+      `Certificates can be generated after the last session ends (${completedSessions} of ${totalSessions} sessions completed)`,
+    );
+  }
 
   const summary = await getWorkshopSummary(workshopId);
-  const result = { workshopId, threshold: env.certificateThreshold, totalSessions: sessions.length, generated: [], alreadyIssued: [], notEligible: [] };
+  const result = { workshopId, threshold: env.certificateThreshold, totalSessions, generated: [], alreadyIssued: [], notEligible: [] };
 
   for (const participant of summary) {
     const entry = {

@@ -9,6 +9,8 @@ router.use(authenticate, authorize('ADMIN'));
 router.get('/stats', adminController.stats);
 router.get('/users', adminController.listUsers);
 router.post('/users', adminController.createUser);
-router.patch('/users/:id/role', adminController.changeRole);
+router.patch('/users/:id/suspend', adminController.suspend);
+router.patch('/users/:id/reactivate', adminController.reactivate);
+router.delete('/users/:id', adminController.remove);
 
 export default router;

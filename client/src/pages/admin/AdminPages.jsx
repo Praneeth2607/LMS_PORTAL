@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useAction, useDocumentTitle } from '../../hooks/useUtils.js';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { changeRole, createUser, getStats, listUsers } from '../../services/adminService.js';
+import { createUser, deleteUser, getStats, listUsers, reactivateUser, suspendUser } from '../../services/adminService.js';
 import { listWorkshops } from '../../services/workshopService.js';
 import { listWorkshopCertificates } from '../../services/certificateService.js';
 import { Page } from '../../layouts/AppLayout.jsx';
@@ -174,21 +174,54 @@ function UsersPage({ role, title, description }) {
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState(null);
-  const roleAction = useAction();
-  const { data, error, loading, reload } = useAsync(() => listUsers({ role, search: query }), [role, query]);
+  const [busyId, setBusyId] = useState(null);
+  const userAction = useAction();
+  const { data, error, loading, reload, setData } = useAsync(() => listUsers({ role, search: query }), [role, query]);
+  const showProgress = role === 'PARTICIPANT';
 
   useEffect(() => {
     const id = setTimeout(() => setQuery(search.trim()), 300);
     return () => clearTimeout(id);
   }, [search]);
 
-  const onRoleChange = async (target, newRole) => {
-    if (!window.confirm(`Change ${target.name}'s role to ${roleLabel(newRole)}?`)) return;
-    const result = await roleAction.run(() => changeRole(target.id, newRole));
+  // update(list, responseData) applies the change to the table immediately;
+  // the silent reload then re-syncs with the server.
+  const perform = async (target, fn, message, update) => {
+    setNotice(null);
+    setBusyId(target.id);
+    const result = await userAction.run(fn);
+    setBusyId(null);
     if (result.ok) {
-      setNotice(`${target.name} is now ${roleLabel(newRole).toLowerCase()}.`);
+      setData((list) => update(list, result.data));
+      setNotice(typeof message === 'function' ? message(result.data) : message);
       reload({ silent: true });
     }
+  };
+  const merge = (list, updated) => list.map((x) => (x.id === updated.id ? { ...x, ...updated } : x));
+
+  const onSuspend = (u) => {
+    if (!window.confirm(`Suspend ${u.name}? They will be signed out and unable to sign in until an admin reactivates them.`)) return;
+    perform(u, () => suspendUser(u.id), `${u.name} has been suspended.`, merge);
+  };
+
+  const onReactivate = (u) => perform(u, () => reactivateUser(u.id), `${u.name} can sign in again.`, merge);
+
+  const onDelete = (u) => {
+    const warning = u.suspendedAt
+      ? ' Their email will be blocked from signing up again; only an admin can create an account with it.'
+      : '';
+    if (
+      !window.confirm(
+        `Permanently delete ${u.name} (${u.email})? Their registrations, attendance and certificates are removed. This cannot be undone.${warning}`,
+      )
+    )
+      return;
+    perform(
+      u,
+      () => deleteUser(u.id),
+      (res) => res.message,
+      (list) => list.filter((x) => x.id !== u.id),
+    );
   };
 
   return (
@@ -207,7 +240,10 @@ function UsersPage({ role, title, description }) {
       />
       {adding && (
         <section className="panel mb-12">
-          <h2 className="card-title mb-6">New account</h2>
+          <h2 className="card-title mb-2">New account</h2>
+          <p className="mb-6 text-charcoal">
+            Admins can also re-create accounts for emails that were blocked after a suspended user was deleted.
+          </p>
           <CreateUserForm
             defaultRole={role}
             onCancel={() => setAdding(false)}
@@ -224,9 +260,9 @@ function UsersPage({ role, title, description }) {
           {notice}
         </Notice>
       )}
-      {roleAction.error && (
+      {userAction.error && (
         <Notice tone="error" className="mb-8">
-          {roleAction.error.message}
+          {userAction.error.message}
         </Notice>
       )}
 
@@ -258,37 +294,63 @@ function UsersPage({ role, title, description }) {
             <tr>
               <th scope="col">Name</th>
               <th scope="col">Joined</th>
-              <th scope="col">Role</th>
+              {showProgress && <th scope="col">Workshops attended</th>}
+              {showProgress && <th scope="col">Certificates</th>}
+              <th scope="col">Status</th>
+              <th scope="col">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {data.map((u) => (
-              <tr key={u.id}>
+              <tr key={u.id} className={u.suspendedAt ? 'opacity-70' : ''}>
                 <td data-label="">
                   <p className="font-medium">{u.name}</p>
                   <p className="text-[14px] text-slate">{u.email}</p>
                 </td>
                 <td data-label="Joined">{formatDate(u.createdAt.slice(0, 10))}</td>
-                <td data-label="Role">
+                {showProgress && <td data-label="Workshops attended">{u.workshopsAttended}</td>}
+                {showProgress && <td data-label="Certificates">{u.certificatesCount}</td>}
+                <td data-label="Status">
+                  {u.suspendedAt ? <StatusBadge status="SUSPENDED" /> : <StatusBadge status="ACTIVE" />}
+                </td>
+                <td data-label="">
                   {u.id === me.id ? (
-                    <StatusBadge status={u.role} />
+                    <span className="text-[14px] text-slate">This is you</span>
                   ) : (
-                    <>
-                      <label htmlFor={`role-${u.id}`} className="sr-only">
-                        Role for {u.name}
-                      </label>
-                      <select
-                        id={`role-${u.id}`}
-                        className="input max-w-[200px] py-2"
-                        value={u.role}
-                        disabled={roleAction.pending}
-                        onChange={(e) => onRoleChange(u, e.target.value)}
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {u.suspendedAt ? (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          disabled={busyId === u.id}
+                          onClick={() => onReactivate(u)}
+                        >
+                          {busyId === u.id && <Spinner />} Reactivate
+                          <span className="sr-only"> {u.name}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          disabled={busyId === u.id}
+                          onClick={() => onSuspend(u)}
+                        >
+                          {busyId === u.id && <Spinner />} Suspend
+                          <span className="sr-only"> {u.name}</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        disabled={busyId === u.id}
+                        onClick={() => onDelete(u)}
                       >
-                        <option value="PARTICIPANT">Participant</option>
-                        <option value="ORGANIZER">Organizer</option>
-                        <option value="ADMIN">Admin</option>
-                      </select>
-                    </>
+                        <Icon name="trash" size={16} /> Delete
+                        <span className="sr-only"> {u.name}</span>
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>

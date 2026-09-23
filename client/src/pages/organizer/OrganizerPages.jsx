@@ -142,7 +142,7 @@ export function OrganizerDashboard() {
                   <tr>
                     <th scope="col">Workshop</th>
                     <th scope="col">Registered</th>
-                    <th scope="col">Sessions</th>
+                    <th scope="col">Sessions completed</th>
                     <th scope="col">Eligible for certificate</th>
                     <th scope="col">
                       <span className="sr-only">Actions</span>
@@ -158,7 +158,9 @@ export function OrganizerDashboard() {
                           <span className="font-medium">{workshop.title}</span>
                         </td>
                         <td data-label="Registered">{workshop.registeredCount}</td>
-                        <td data-label="Sessions">{summary.totalSessions}</td>
+                        <td data-label="Sessions completed">
+                          {summary.completedSessions} / {summary.totalSessions}
+                        </td>
                         <td data-label="Eligible">
                           {summary.eligibleCount} of {summary.participants.length}
                         </td>
@@ -581,7 +583,7 @@ export function ParticipantsPage() {
                         {formatPercent(r.attendance.percentage)}
                         <span className="text-slate">
                           {' '}
-                          · {r.attendance.attendedSessions}/{r.attendance.totalSessions}
+                          · {r.attendance.attendedSessions}/{r.attendance.completedSessions} completed
                         </span>
                       </span>
                     ) : (

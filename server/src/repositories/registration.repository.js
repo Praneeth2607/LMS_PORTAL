@@ -1,4 +1,6 @@
+import env from '../config/env.js';
 import { query } from '../db/pool.js';
+import { sessionEnded } from '../utils/sql.js';
 import { camelize, camelizeRows } from '../utils/case.js';
 
 export async function findOne(workshopId, participantId, db) {
@@ -82,10 +84,12 @@ export async function listForParticipant(participantId) {
             w.id AS workshop_id, w.title, w.description, w.start_date, w.end_date, w.mode,
             w.venue, w.meeting_link, w.status AS workshop_status, u.name AS organizer_name,
             (SELECT COUNT(*) FROM sessions s WHERE s.workshop_id = w.id) AS total_sessions,
+            (SELECT COUNT(*) FROM sessions s
+              WHERE s.workshop_id = w.id AND ${sessionEnded('s', '$2')}) AS completed_sessions,
             (SELECT COUNT(*) FROM attendance a
                JOIN sessions s ON s.id = a.session_id
               WHERE s.workshop_id = w.id AND a.participant_id = r.participant_id
-                AND a.status = 'PRESENT') AS attended_sessions,
+                AND a.status = 'PRESENT' AND ${sessionEnded('s', '$2')}) AS attended_sessions,
             c.certificate_id, c.issued_at AS certificate_issued_at
      FROM registrations r
      JOIN workshops w ON w.id = r.workshop_id
@@ -93,7 +97,7 @@ export async function listForParticipant(participantId) {
      LEFT JOIN certificates c ON c.workshop_id = w.id AND c.participant_id = r.participant_id
      WHERE r.participant_id = $1
      ORDER BY w.start_date DESC`,
-    [participantId],
+    [participantId, env.appTimezone],
   );
   return camelizeRows(rows);
 }

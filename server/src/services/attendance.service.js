@@ -10,15 +10,19 @@ import { badRequest, conflict, forbidden, HttpError } from '../utils/httpError.j
 
 // ---- Calculation (single source of truth for percentage and eligibility) ----
 
-export function calculateAttendance(attendedSessions, totalSessions, threshold = env.certificateThreshold) {
-  const percentage = totalSessions > 0 ? Math.round((attendedSessions * 10000) / totalSessions) / 100 : 0;
+// percentage = sessions attended / sessions COMPLETED so far (not all scheduled
+// sessions), so it reflects attendance up to now. attendedSessions only counts
+// completed sessions.
+export function calculateAttendance(attendedSessions, completedSessions, totalSessions, threshold = env.certificateThreshold) {
+  const percentage = completedSessions > 0 ? Math.round((attendedSessions * 10000) / completedSessions) / 100 : 0;
   return {
     totalSessions,
+    completedSessions,
     attendedSessions,
     percentage,
     threshold,
     // Integer comparison avoids floating point edge cases (9/10 must be exactly 90%).
-    eligible: totalSessions > 0 && attendedSessions * 100 >= threshold * totalSessions,
+    eligible: completedSessions > 0 && attendedSessions * 100 >= threshold * completedSessions,
   };
 }
 
@@ -29,7 +33,7 @@ export async function getWorkshopSummary(workshopId, participantId = null) {
     participantId: row.participantId,
     participantName: row.participantName,
     participantEmail: row.participantEmail,
-    ...calculateAttendance(row.attendedSessions, row.totalSessions),
+    ...calculateAttendance(row.attendedSessions, row.completedSessions, row.totalSessions),
   }));
 }
 
@@ -140,12 +144,13 @@ export async function getWorkshopAttendance(workshopId, user) {
   }
 
   return {
-    sessions: sessions.map(({ id, title, sessionDate, startTime, endTime, attendanceOpen }) => ({
+    sessions: sessions.map(({ id, title, sessionDate, startTime, endTime, status, attendanceOpen }) => ({
       id,
       title,
       sessionDate,
       startTime,
       endTime,
+      status,
       attendanceOpen,
     })),
     participants: [...byParticipant.values()],
@@ -154,11 +159,15 @@ export async function getWorkshopAttendance(workshopId, user) {
 
 export async function getAttendanceSummary(workshopId, user) {
   await getManageableWorkshop(workshopId, user);
-  const participants = await getWorkshopSummary(workshopId);
+  const [participants, counts] = await Promise.all([
+    getWorkshopSummary(workshopId),
+    attendanceRepository.sessionCounts(workshopId),
+  ]);
   return {
     workshopId,
     threshold: env.certificateThreshold,
-    totalSessions: participants[0]?.totalSessions ?? (await listSessions(workshopId, user)).length,
+    totalSessions: counts.totalSessions,
+    completedSessions: counts.completedSessions,
     eligibleCount: participants.filter((p) => p.eligible).length,
     participants,
   };

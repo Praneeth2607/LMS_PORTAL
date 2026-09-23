@@ -26,6 +26,7 @@ import {
   AttendanceSummary,
   CertificateActions,
   CertificateStatus,
+  JoinButton,
   MeetingInfo,
   SessionList,
 } from '../../components/workshop.jsx';
@@ -129,11 +130,7 @@ export function ParticipantDashboard() {
                         </Link>
                       )}
                       {s.myAttendanceStatus === 'PRESENT' && <StatusBadge status="PRESENT" />}
-                      {s.meetingLink && (
-                        <a href={s.meetingLink} target="_blank" rel="noreferrer" className="btn btn-secondary">
-                          Join online<span className="sr-only"> (opens in a new tab)</span>
-                        </a>
-                      )}
+                      <JoinButton session={s} />
                     </div>
                   </li>
                 ))}
@@ -152,12 +149,12 @@ export function ParticipantDashboard() {
                     </Link>
                     {entry.certificate ? (
                       <StatusBadge status="ISSUED" />
-                    ) : entry.attendance.totalSessions > 0 ? (
+                    ) : entry.attendance.completedSessions > 0 ? (
                       <StatusBadge status={entry.attendance.eligible ? 'ELIGIBLE' : 'NOT_ELIGIBLE'} />
                     ) : null}
                   </div>
                   <p className="mt-2 text-[15px] text-slate">
-                    {entry.attendance.attendedSessions} of {entry.attendance.totalSessions} sessions ·{' '}
+                    {entry.attendance.attendedSessions} of {entry.attendance.completedSessions} completed sessions ·{' '}
                     {formatPercent(entry.attendance.percentage)}
                   </p>
                   <div className="mt-auto pt-6">
@@ -237,16 +234,18 @@ export function MyWorkshopsPage() {
                   <StatusBadge status={entry.registrationStatus} />
                 </td>
                 <td data-label="Attendance">
-                  {entry.attendance.totalSessions ? (
+                  {entry.attendance.completedSessions ? (
                     <span>
                       <span className="font-medium">{formatPercent(entry.attendance.percentage)}</span>
                       <span className="text-slate">
                         {' '}
-                        · {entry.attendance.attendedSessions}/{entry.attendance.totalSessions}
+                        · {entry.attendance.attendedSessions}/{entry.attendance.completedSessions} completed
                       </span>
                     </span>
                   ) : (
-                    <span className="text-slate">No sessions yet</span>
+                    <span className="text-slate">
+                      {entry.attendance.totalSessions ? 'No completed sessions yet' : 'No sessions yet'}
+                    </span>
                   )}
                 </td>
                 <td data-label="Certificate">
@@ -254,7 +253,7 @@ export function MyWorkshopsPage() {
                     <Link to={`/certificates/${entry.certificate.certificateId}`} className="link-ink font-medium">
                       View
                     </Link>
-                  ) : entry.attendance.totalSessions > 0 ? (
+                  ) : entry.attendance.completedSessions > 0 ? (
                     <StatusBadge status={entry.attendance.eligible ? 'ELIGIBLE' : 'NOT_ELIGIBLE'} />
                   ) : (
                     <span className="text-slate">–</span>

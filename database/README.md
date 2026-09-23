@@ -43,6 +43,7 @@ Migrations are additive and idempotent (`ADD COLUMN IF NOT EXISTS` …), so runn
 | Migration                       | Adds                                           |
 | ------------------------------- | ---------------------------------------------- |
 | `001_session_started_at.sql`    | `sessions.started_at`, for the organizer's "Start session" button |
+| `002_user_suspension.sql`       | `users.suspended_at`, and the `blocked_emails` table |
 
 ## Demo accounts
 

@@ -90,6 +90,8 @@ const STATUS = {
   READY: ['Ready to start', 'accent'],
   ONGOING: ['Ongoing', 'strong'],
   COMPLETED: ['Completed', 'muted'],
+  ACTIVE: ['Active', 'neutral'],
+  SUSPENDED: ['Suspended', 'muted'],
   OPEN: ['Attendance open', 'accent'],
   NOT_MARKED: ['Not marked', 'muted'],
   ADMIN: ['Admin', 'strong'],

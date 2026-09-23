@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAction, useDocumentTitle } from '../../hooks/useUtils.js';
 import { TextField, fieldErrors } from '../../components/Form.jsx';
 import { Eyebrow, Notice, Orbit, Spinner } from '../../components/ui.jsx';
 import { destinationAfterAuth, safeNext } from '../../utils/roles.js';
+import { clearAuthNotice, readAuthNotice } from '../../services/api.js';
 
 function AuthShell({ eyebrow, title, intro, children, footer }) {
   return (
@@ -30,6 +31,8 @@ export function LoginPage() {
   const navigate = useNavigate();
   const next = safeNext(params.get('next'));
   const [form, setForm] = useState({ email: '', password: '' });
+  const [sessionNotice, setSessionNotice] = useState(readAuthNotice);
+  useEffect(clearAuthNotice, []); // show it once
   const { pending, error, run } = useAction();
   const errors = fieldErrors(error);
 
@@ -37,6 +40,7 @@ export function LoginPage() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setSessionNotice(null);
     const result = await run(() => login(form));
     if (result.ok) navigate(destinationAfterAuth(next, result.data), { replace: true });
   };
@@ -58,6 +62,11 @@ export function LoginPage() {
       }
     >
       <h2 className="card-title mb-8">Sign in</h2>
+      {sessionNotice && (
+        <Notice tone={/suspended/i.test(sessionNotice) ? 'error' : 'info'} className="mb-6">
+          {sessionNotice}
+        </Notice>
+      )}
       {next?.startsWith('/attendance/') && (
         <Notice className="mb-6">Sign in to mark your attendance. You&rsquo;ll return to the session right after.</Notice>
       )}
