@@ -93,6 +93,7 @@ const STATUS = {
   ACTIVE: ['Active', 'neutral'],
   SUSPENDED: ['Suspended', 'muted'],
   OPEN: ['Attendance open', 'accent'],
+  WATCHING: ['Watching now', 'accent'],
   NOT_MARKED: ['Not marked', 'muted'],
   ADMIN: ['Admin', 'strong'],
   ORGANIZER: ['Organizer', 'neutral'],

@@ -1,5 +1,6 @@
 import * as sessionRepository from '../repositories/session.repository.js';
 import env from '../config/env.js';
+import { prepareRoom } from './presence.service.js';
 import { badRequest, conflict, notFound } from '../utils/httpError.js';
 import { canManage, canSeeMeetingLink, getManageableWorkshop, getVisibleWorkshop } from './workshop.service.js';
 
@@ -15,10 +16,12 @@ export function attendanceWindow(session) {
 // meeting links from people who are not registered.
 function present(session, workshop, user) {
   const manager = canManage(workshop, user);
-  const { attendanceToken, attendanceCode, myAttendanceStatus, ...rest } = session;
+  const { attendanceToken, attendanceCode, myAttendanceStatus, videoRoomName, videoRoomUrl, ...rest } = session;
   return {
     ...rest,
     meetingLink: canSeeMeetingLink(workshop, user) ? session.meetingLink || workshop.meetingLink : null,
+    // Online/hybrid sessions run live inside the portal (/sessions/:id/live).
+    liveInPortal: workshop.mode !== 'OFFLINE',
     ...(manager && {
       attendanceCode: session.attendanceOpen ? attendanceCode : null,
       attendanceOpensAt: attendanceWindow(session).opensAt,
@@ -92,6 +95,8 @@ export async function startSession(sessionId, user) {
   }
   if (session.status === 'COMPLETED') throw conflict('This session has already ended');
   if (session.status === 'READY') await sessionRepository.markStarted(session.id);
+  // Online/hybrid: have the live room ready for participants.
+  if (workshop.mode !== 'OFFLINE') await prepareRoom(session);
   return getSession(sessionId, user);
 }
 

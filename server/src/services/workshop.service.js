@@ -102,9 +102,6 @@ export async function publishWorkshop(workshopId, user) {
   if (['OFFLINE', 'HYBRID'].includes(workshop.mode) && !workshop.venue) {
     problems.push({ field: 'venue', message: `A venue is required for ${workshop.mode} workshops` });
   }
-  if (['ONLINE', 'HYBRID'].includes(workshop.mode) && !workshop.meetingLink) {
-    problems.push({ field: 'meetingLink', message: `A meeting link is required for ${workshop.mode} workshops` });
-  }
   if (problems.length) throw badRequest('Workshop is not ready to publish', problems);
 
   await workshopRepository.setStatus(workshopId, 'PUBLISHED');

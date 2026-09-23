@@ -45,6 +45,7 @@ Migrations are additive and idempotent (`ADD COLUMN IF NOT EXISTS` …), so runn
 | `001_session_started_at.sql`    | `sessions.started_at`, for the organizer's "Start session" button |
 | `002_user_suspension.sql`       | `users.suspended_at`, and the `blocked_emails` table |
 | `003_organizer_requests.sql`    | `organizer_requests` table (organizer access requests awaiting admin approval) |
+| `004_live_sessions_presence.sql` | `sessions.video_room_*`, `session_watch_logs`, attendance method `PRESENCE` |
 
 ## Demo accounts
 

@@ -9,7 +9,7 @@
 
 BEGIN;
 
-DROP TABLE IF EXISTS organizer_requests, blocked_emails, certificates, announcements, attendance, sessions,
+DROP TABLE IF EXISTS session_watch_logs, organizer_requests, blocked_emails, certificates, announcements, attendance, sessions,
                      registrations, registration_fields, workshops, users CASCADE;
 
 -- Keeps updated_at current on UPDATE.
@@ -146,6 +146,8 @@ CREATE TABLE sessions (
   attendance_active      BOOLEAN      NOT NULL DEFAULT FALSE,
   attendance_expires_at  TIMESTAMPTZ,
   started_at             TIMESTAMPTZ,  -- set when the organizer presses "Start session"
+  video_room_name        VARCHAR(64),  -- Daily.co room for online/hybrid sessions
+  video_room_url         TEXT,
   created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   CHECK (end_time > start_time)
@@ -162,11 +164,27 @@ CREATE TABLE attendance (
   status          VARCHAR(10) NOT NULL DEFAULT 'PRESENT'
                     CHECK (status IN ('PRESENT', 'ABSENT')),
   method          VARCHAR(10) NOT NULL DEFAULT 'QR'
-                    CHECK (method IN ('QR', 'CODE', 'MANUAL')),
+                    CHECK (method IN ('QR', 'CODE', 'MANUAL', 'PRESENCE')),
   marked_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (session_id, participant_id)
 );
 CREATE INDEX idx_attendance_participant ON attendance(participant_id);
+
+-- ---------------------------------------------------------------------
+-- session_watch_logs: verified watch time (proof of active presence) per
+-- participant per online/hybrid session. Grows only via server-checked
+-- heartbeats; at 75% of the session length attendance is marked PRESENT.
+-- ---------------------------------------------------------------------
+CREATE TABLE session_watch_logs (
+  id                 INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  session_id         INTEGER     NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  participant_id     INTEGER     NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+  active_seconds     INTEGER     NOT NULL DEFAULT 0 CHECK (active_seconds >= 0),
+  last_heartbeat_at  TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (session_id, participant_id)
+);
 
 -- ---------------------------------------------------------------------
 -- announcements

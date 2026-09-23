@@ -223,7 +223,7 @@ export default function WorkshopForm({ initial, submitLabel, onSubmit, onCancel 
             label="Meeting link"
             type="url"
             placeholder="https://"
-            hint="Required before an online or hybrid workshop can be published. Only registered participants see it."
+            hint="Optional backup link. Online sessions run live inside the portal, where attendance is tracked automatically."
             {...bind('meetingLink')}
           />
         )}

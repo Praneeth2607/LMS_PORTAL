@@ -30,7 +30,8 @@ const sessionColumns = (tz) => {
     WHEN NOW() >= ${startsAt} THEN 'READY'
     ELSE 'SCHEDULED'
   END AS status,
-  s.meeting_link, s.attendance_token, s.attendance_code, s.attendance_expires_at,
+  s.meeting_link, s.video_room_name, s.video_room_url,
+  s.attendance_token, s.attendance_code, s.attendance_expires_at,
   (s.attendance_active AND s.attendance_expires_at > NOW()) AS attendance_open,
   s.created_at, s.updated_at`;
 };
@@ -78,6 +79,20 @@ export async function update(id, data) {
     `UPDATE sessions SET ${sets}${rescheduled ? ', started_at = NULL' : ''} WHERE id = $1`,
     [id, ...values],
   );
+}
+
+// Saves the Daily room for a session unless one was saved concurrently;
+// returns the saved room, or null if another request won.
+export async function setVideoRoom(id, { name, url }) {
+  const { rows } = await query(
+    `UPDATE sessions SET video_room_name = $2, video_room_url = $3
+     WHERE id = $1 AND video_room_name IS NULL
+     RETURNING video_room_name AS name, video_room_url AS url`,
+    [id, name, url],
+  );
+  if (rows[0]) return rows[0];
+  const { rows: existing } = await query('SELECT video_room_name AS name, video_room_url AS url FROM sessions WHERE id = $1', [id]);
+  return existing[0] || null;
 }
 
 // Marks the session as started (idempotent: keeps the first start time).

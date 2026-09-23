@@ -75,16 +75,13 @@ export function SessionList({ sessions, participantView = false }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[18px] font-medium tracking-[-0.01em]">{session.title}</p>
-            {session.meetingLink && !participantView && (
-              <a
-                href={session.meetingLink}
-                target="_blank"
-                rel="noreferrer"
+            {session.liveInPortal && !participantView && (
+              <Link
+                to={`/sessions/${session.id}/live`}
                 className="link mt-1 inline-flex min-h-11 items-center gap-1.5 text-[15px] sm:min-h-0"
               >
-                Join online <Icon name="external" size={15} />
-                <span className="sr-only">(opens in a new tab)</span>
-              </a>
+                Live room <Icon name="arrowRight" size={15} />
+              </Link>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -109,11 +106,12 @@ export function SessionList({ sessions, participantView = false }) {
 const sessionPast = (s) => new Date(`${s.sessionDate}T${s.endTime}:00`) < new Date();
 
 // ---------------------------------------------------------------- Join (participant)
-// For sessions with a meeting link: enabled from the scheduled start time until
-// the session ends. Re-checks the clock every 15s, so it unlocks without a reload.
+// Online/hybrid sessions: opens the live room inside the portal (where watch
+// time is verified). Enabled from the scheduled start time until the session
+// ends; re-checks the clock every 15s, so it unlocks without a reload.
 export function JoinButton({ session }) {
   const now = useNow(15000);
-  if (!session.meetingLink) return null;
+  if (!session.liveInPortal) return null;
   const status = sessionLiveStatus(session, now);
   if (status === 'COMPLETED') return null;
   if (status === 'SCHEDULED') {
@@ -124,10 +122,10 @@ export function JoinButton({ session }) {
     );
   }
   return (
-    <a href={session.meetingLink} target="_blank" rel="noreferrer" className="btn btn-primary">
+    <Link to={`/sessions/${session.id}/live`} className="btn btn-primary">
       <Icon name="video" size={18} /> Join session
-      <span className="sr-only"> {session.title} (opens in a new tab)</span>
-    </a>
+      <span className="sr-only"> {session.title}</span>
+    </Link>
   );
 }
 
@@ -302,15 +300,12 @@ export function MeetingInfo({ workshop }) {
             <Icon name="video" />
           </span>
           <div className="min-w-0">
-            <p className="text-[14px] text-slate">Meeting link</p>
-            {workshop.meetingLink ? (
-              <a href={workshop.meetingLink} target="_blank" rel="noreferrer" className="link break-all font-medium">
-                {workshop.meetingLink}
-                <span className="sr-only"> (opens in a new tab)</span>
-              </a>
-            ) : (
-              <p className="font-medium text-charcoal">Shared with registered participants</p>
-            )}
+            <p className="text-[14px] text-slate">Online</p>
+            <p className="font-medium">Live here in the portal</p>
+            <p className="text-[14px] text-slate">
+              Registered participants join from the session list. Watch time is verified and attendance is recorded
+              automatically.
+            </p>
           </div>
         </div>
       )}

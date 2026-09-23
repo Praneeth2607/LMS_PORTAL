@@ -92,7 +92,7 @@ form inputs. For registration form answers, `field` is the registration field's 
 | Registration status  | `REGISTERED`, `CANCELLED`                                              |
 | Registration field type | `TEXT`, `TEXTAREA`, `EMAIL`, `PHONE`, `NUMBER`, `DATE`, `SELECT`, `CHECKBOX` |
 | Attendance status    | `PRESENT`, `ABSENT`                                                    |
-| Attendance method    | `QR`, `CODE`, `MANUAL`                                                 |
+| Attendance method    | `QR`, `CODE`, `MANUAL`, `PRESENCE` (verified watch time in the live room) |
 
 Workshop status meanings:
 
@@ -412,6 +412,8 @@ Sets status to `CLOSED`, which stops new registrations. Attendance and certifica
 **Access:** Manager (owner or admin)
 
 Response `200` (message `"Workshop closed"`): workshop object.
+
+QR/code attendance is for **in-person** attendees. It is refused (`409`) for `ONLINE` workshops, which record attendance automatically in the live room.
 
 Allowed only between `attendanceOpensAt` (session start) and `attendanceClosesAt` (2 hours after the session ends). If fewer minutes than `durationMinutes` remain before the close time, the code expires at the close time and `durationMinutes` in the response is reduced to match.
 
@@ -868,6 +870,116 @@ Errors: `401` · `403` · `404`
 
 ---
 
+## Live sessions & proof of active presence
+
+Online and hybrid sessions run **inside the portal** on Jitsi (JaaS, 8x8.vc), or on Daily.co when `VIDEO_PROVIDER=daily` (page `/sessions/:id/live`). Google Meet and Zoom
+cannot be embedded, so presence could not be verified there.
+
+- In-person (`OFFLINE`) sessions keep QR/code attendance.
+- `ONLINE` workshops record attendance only from verified watch time.
+- `HYBRID` workshops support both: QR for people in the room, presence for remote attendees.
+
+How watch time is verified:
+
+1. The browser sends a heartbeat every `heartbeatIntervalSeconds` (60s by default), but only while the person is
+   **in the call**, the page is **visible** and they are **not idle**.
+2. The server measures the gap since the previous heartbeat with its own clock:
+   - first heartbeat: starts the clock, credits nothing;
+   - gap under 0.8 × interval: `429`, credits nothing (anti-spam);
+   - gap between 0.8× and 1.5× the interval: one interval is credited;
+   - longer gap (tab hidden, idle, left the call): nothing is credited for the gap, and the clock restarts.
+
+   Credited time never exceeds the session length. The browser never states how much time to add.
+3. When verified time reaches `PRESENCE_THRESHOLD_PERCENT` (75%) of the session length (end time minus start time),
+   the server records attendance automatically: `PRESENT`, method `PRESENCE`.
+
+**Demo mode** is set by the server (`PRESENCE_DEMO_MODE=true`) and can't be turned on from the browser. In demo mode, heartbeats come every 5s and each counts as
+15 minutes, and the idle timeout is 15s. `config.demoMode` tells the UI to show a badge.
+
+### Presence status object
+
+```json
+{
+  "sessionId": 15, "liveState": "LIVE",
+  "activeSeconds": 2700, "activeMinutes": 45, "requiredSeconds": 2700, "requiredMinutes": 45,
+  "durationMinutes": 60, "progressPercent": 100, "isEligible": true,
+  "attendanceStatus": "PRESENT", "attendanceMethod": "PRESENCE", "lastHeartbeatAt": "2026-09-24T08:40:05.000Z",
+  "config": { "heartbeatIntervalSeconds": 60, "idleTimeoutSeconds": 120, "thresholdPercent": 75, "demoMode": false }
+}
+```
+
+`liveState`: `BEFORE` | `LIVE` | `ENDED`. Heartbeats only count while the state is `LIVE`.
+
+### POST `/api/sessions/:id/video/join`
+
+Opens the live room. The server names the session's room on first use and reuses it after that (Daily creates a private room; JaaS rooms exist on demand), then
+returns a personal, expiring join token.
+
+**Access:** Auth. Allowed for participants registered for the workshop, and for the workshop's organizer or an admin (who get an owner token).
+
+Response `200`:
+
+```json
+{
+  "roomUrl": "https://8x8.vc/vpaas-magic-cookie-…/cict-15-6gpf6f",
+  "token": "eyJ…",
+  "call": { "provider": "jitsi", "domain": "8x8.vc", "roomName": "vpaas-magic-cookie-…/cict-15-6gpf6f",
+            "scriptUrl": "https://8x8.vc/vpaas-magic-cookie-…/external_api.js" },
+  "isOwner": false,
+  "session": { "id": 15, "title": "OWASP Top 10 Walkthrough", "workshopId": 3, "workshopTitle": "…",
+               "sessionDate": "2026-10-03", "startTime": "18:00", "endTime": "20:00", "startsAt": "…", "endsAt": "…" },
+  "presence": { …presence status object… }
+}
+```
+
+`presence` is `null` for owners. For Jitsi, `token` is a JaaS JWT signed by the server (RS256, organizers get `moderator: "true"`) and the frontend loads `call.scriptUrl` and embeds `new JitsiMeetExternalAPI(call.domain, { roomName, jwt: token })`. For Daily (`call.provider: "daily"`) it passes `roomUrl` and `token` to `@daily-co/daily-js`.
+
+Errors:
+
+- `400` in-person session.
+- `403` not registered, or another organizer.
+- `409` for any of these:
+  - `"The live room opens at 18:00 on 2026-10-03"` (participants may join from the start time; organizers 30 minutes earlier);
+  - `"This session has ended"`;
+  - the workshop is a draft.
+- `502` the video service failed.
+- `503` the video provider is not configured (`JAAS_*` or `DAILY_API_KEY` missing).
+
+### POST `/api/sessions/:id/heartbeat`
+
+**Access:** Participant (registered).
+
+No request body.
+
+Response `200`: the [presence status object](#presence-status-object), plus `creditedSeconds` (what this heartbeat added).
+
+Errors:
+
+- `403` not registered.
+- `409` the session hasn't started or has ended.
+- `429` the heartbeat came too early. It's safe to ignore; nothing is credited.
+
+### GET `/api/sessions/:id/presence`
+
+**Access:** Participant.
+
+Response `200`: the caller's [presence status object](#presence-status-object).
+
+### GET `/api/sessions/:id/presence/participants`
+
+**Access:** Manager (owner or admin).
+
+Response `200`: the presence status fields for the session, plus `participants`:
+
+```json
+[{ "participantId": 8, "participantName": "Sneha Patel", "participantEmail": "…", "activeSeconds": 2700,
+   "activeMinutes": 45, "progressPercent": 100, "watchingNow": true, "attendanceStatus": "PRESENT", "attendanceMethod": "PRESENCE" }]
+```
+
+`watchingNow` is `true` when the participant's last heartbeat was within the last two intervals.
+
+---
+
 ## Certificates
 
 ### Certificate object
@@ -1255,6 +1367,10 @@ Phones can't open `localhost`. Set `FRONTEND_URL` in `server/.env` to the laptop
 | POST   | `/api/sessions/:id/attendance/mark`          | Participant |
 | POST   | `/api/sessions/:id/attendance/stop`          | Manager     |
 | POST   | `/api/sessions/:id/attendance/manual`        | Manager     |
+| POST   | `/api/sessions/:id/video/join`               | Auth        |
+| POST   | `/api/sessions/:id/heartbeat`                | Participant |
+| GET    | `/api/sessions/:id/presence`                 | Participant |
+| GET    | `/api/sessions/:id/presence/participants`    | Manager     |
 | GET    | `/api/workshops/:id/attendance`              | Manager     |
 | GET    | `/api/workshops/:id/attendance/summary`      | Manager     |
 | POST   | `/api/workshops/:id/certificates/generate`   | Manager     |

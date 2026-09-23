@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useAction, useDocumentTitle, useInterval, useNow } from '../../hooks/useUtils.js';
 import { createSession, deleteSession, listSessions, startSession, updateSession } from '../../services/sessionService.js';
@@ -241,14 +241,14 @@ const formatGap = (ms) => {
 // ---------------------------------------------------------------- Start / join control
 // status is the live lifecycle (see sessionLiveStatus). The server enforces the
 // same rules when the button is pressed.
+// Online/hybrid sessions run in the live room inside the portal.
 function SessionStartControl({ session, status, online, draft, starting, onStart }) {
-  const link = online ? session.meetingLink : null;
   if (status === 'COMPLETED') return null;
   if (status === 'ONGOING') {
-    return link ? (
-      <a href={link} target="_blank" rel="noreferrer" className="btn btn-primary">
-        <Icon name="video" size={18} /> Join meeting<span className="sr-only"> (opens in a new tab)</span>
-      </a>
+    return online ? (
+      <Link to={`/sessions/${session.id}/live`} className="btn btn-primary">
+        <Icon name="video" size={18} /> Open live room
+      </Link>
     ) : null;
   }
   const locked = status === 'SCHEDULED' || draft;
@@ -260,8 +260,8 @@ function SessionStartControl({ session, status, online, draft, starting, onStart
       onClick={onStart}
       title={draft ? 'Publish the workshop first' : locked ? `Available from ${formatTime(session.startTime)}` : undefined}
     >
-      {starting ? <Spinner /> : <Icon name={link ? 'video' : 'arrowRight'} size={18} />}
-      {link ? 'Start & join meeting' : 'Start session'}
+      {starting ? <Spinner /> : <Icon name={online ? 'video' : 'arrowRight'} size={18} />}
+      {online ? 'Start & open live room' : 'Start session'}
     </button>
   );
 }
@@ -280,6 +280,10 @@ export default function SessionsPage() {
   // Re-render every 15s so "Start session" unlocks when a session's time arrives.
   const now = useNow(15000);
   const isOnline = workshop.mode !== 'OFFLINE';
+  // QR/code attendance is for people in the room; online-only workshops record
+  // attendance automatically from verified watch time in the live room.
+  const usesQr = workshop.mode !== 'ONLINE';
+  const navigate = useNavigate();
 
   const refresh = () => {
     reload({ silent: true });
@@ -294,31 +298,19 @@ export default function SessionsPage() {
     }
   };
 
-  // Online/hybrid: open the meeting link. The tab is opened synchronously (inside
-  // the click) so popup blockers allow it, then pointed at the link once the
-  // backend confirms the start; it is closed again if the start is rejected.
+  // Online/hybrid: after starting, go straight into the live room.
   const onStart = async (session) => {
-    const link = isOnline ? session.meetingLink : null;
-    const tab = link ? window.open('', '_blank') : null;
     setStartingId(session.id);
     const result = await action.run(() => startSession(session.id));
     setStartingId(null);
-    if (!result.ok) {
-      tab?.close();
+    if (!result.ok) return;
+    if (isOnline) {
+      navigate(`/sessions/${session.id}/live`);
       return;
     }
     // Show "Ongoing" immediately from the response; the reload below re-syncs the list.
     setData((list) => list.map((s) => (s.id === session.id ? result.data : s)));
-    if (link) {
-      const url = result.data.meetingLink || link;
-      if (tab) {
-        tab.opener = null;
-        tab.location.href = url;
-      } else {
-        window.open(url, '_blank', 'noopener');
-      }
-    }
-    setNotice(`"${session.title}" is now ongoing.${link ? ' The meeting opened in a new tab.' : ''}`);
+    setNotice(`"${session.title}" is now ongoing.`);
     reload({ silent: true });
   };
 
@@ -453,7 +445,7 @@ export default function SessionsPage() {
                     starting={startingId === session.id}
                     onStart={() => onStart(session)}
                   />
-                  {session.attendanceOpen ? (
+                  {!usesQr ? null : session.attendanceOpen ? (
                     <>
                       <button
                         type="button"

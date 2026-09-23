@@ -42,6 +42,9 @@ export async function getWorkshopSummary(workshopId, participantId = null) {
 export async function startAttendance(sessionId, { durationMinutes }, user) {
   const { session, workshop } = await getSessionContext(sessionId, user, { manage: true });
   if (workshop.status === 'DRAFT') throw conflict('Publish the workshop before taking attendance');
+  if (workshop.mode === 'ONLINE') {
+    throw conflict('Online sessions record attendance automatically from verified watch time in the live room.');
+  }
 
   // Only from the session start until the configured time after it ends.
   const { opensAt, closesAt } = attendanceWindow(session);
