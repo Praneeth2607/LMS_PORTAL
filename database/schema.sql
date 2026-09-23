@@ -9,7 +9,7 @@
 
 BEGIN;
 
-DROP TABLE IF EXISTS blocked_emails, certificates, announcements, attendance, sessions,
+DROP TABLE IF EXISTS organizer_requests, blocked_emails, certificates, announcements, attendance, sessions,
                      registrations, registration_fields, workshops, users CASCADE;
 
 -- Keeps updated_at current on UPDATE.
@@ -44,6 +44,30 @@ CREATE TABLE blocked_emails (
   blocked_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   blocked_by  INTEGER      REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- ---------------------------------------------------------------------
+-- organizer_requests: organizer access requested from the sign-in page;
+-- an admin approves (creates the ORGANIZER user) or rejects.
+-- ---------------------------------------------------------------------
+CREATE TABLE organizer_requests (
+  id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name           VARCHAR(120) NOT NULL,
+  email          VARCHAR(255) NOT NULL CHECK (email = LOWER(email)),
+  -- bcrypt hash of the password the applicant chose; moved to users on approval
+  -- (then cleared here). Never stored in plain text.
+  password_hash  TEXT         NOT NULL,
+  designation    VARCHAR(120) NOT NULL,
+  reason         TEXT         NOT NULL,
+  status         VARCHAR(10)  NOT NULL DEFAULT 'PENDING'
+                   CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+  reviewed_by    INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at    TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- At most one PENDING request per email (rejected ones may be re-submitted).
+CREATE UNIQUE INDEX uq_organizer_requests_pending_email
+  ON organizer_requests (email) WHERE status = 'PENDING';
 
 -- ---------------------------------------------------------------------
 -- workshops

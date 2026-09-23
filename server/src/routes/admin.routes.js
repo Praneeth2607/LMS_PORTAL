@@ -12,5 +12,8 @@ router.post('/users', adminController.createUser);
 router.patch('/users/:id/suspend', adminController.suspend);
 router.patch('/users/:id/reactivate', adminController.reactivate);
 router.delete('/users/:id', adminController.remove);
+router.get('/organizer-requests', adminController.listOrganizerRequests);
+router.post('/organizer-requests/:id/approve', adminController.approveOrganizerRequest);
+router.post('/organizer-requests/:id/reject', adminController.rejectOrganizerRequest);
 
 export default router;

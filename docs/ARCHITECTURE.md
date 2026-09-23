@@ -54,7 +54,8 @@ routes → middleware (authenticate, authorize) → controllers → services →
 
 | Service                   | Owns                                                                             |
 | ------------------------- | -------------------------------------------------------------------------------- |
-| `auth.service`            | bcrypt hashing, JWT signing/verification, login, sign-up (`@cict.in` emails → ORGANIZER, others → PARTICIPANT; domain set by `ORGANIZER_EMAIL_DOMAIN`) |
+| `auth.service`            | bcrypt hashing, JWT signing/verification, login (including pending/rejected organizer request messages), sign-up (always PARTICIPANT) |
+| `organizerRequest.service` | Organizer access requests: submit (public), approve (creates the ORGANIZER user) or reject (admin) |
 | `workshop.service`        | Workshop CRUD, publish/close rules, **access helpers** used by all other services: `canManage`, `getVisibleWorkshop`, `getManageableWorkshop` |
 | `registration.service`    | Registration with row lock for capacity, form validation, cancel, "my workshops" |
 | `session.service`         | Session CRUD, hides attendance secrets and meeting links from non-authorized viewers |
@@ -97,6 +98,14 @@ Integrity is enforced by the database, not only the code:
 ## Key flows
 
 ### Authentication
+
+How accounts are created:
+
+- **Participants** sign up themselves.
+- **Organizers** either request access from the sign-in page (Organizer tab → Request organizer access) and wait for an admin to approve, or are created directly by an admin.
+- **Admins** are only created by another admin.
+
+When an organizer request is approved, the password hash chosen at request time is moved into the new user row.
 
 Suspended accounts (`users.suspended_at`) cannot sign in, and `authenticate` rejects their existing tokens with a
 `401`. When an admin deletes a suspended user, their email goes into `blocked_emails`. Self sign-up refuses those
@@ -201,7 +210,6 @@ The routes `/attendance/:sessionId` and `/verify/:certificateId` are required, b
   - `PORT` and `FRONTEND_URL` (used for CORS and the QR URLs);
   - the database connection: either `DATABASE_URL` (the shared Supabase database, with `PGSSL=true`)
     or the individual `PG*` values for a local Postgres;
-  - `ORGANIZER_EMAIL_DOMAIN` (default `cict.in`);
   - `JWT_SECRET`;
   - the attendance window;
   - the certificate threshold.

@@ -3,7 +3,17 @@ import { Link } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useAction, useDocumentTitle } from '../../hooks/useUtils.js';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { createUser, deleteUser, getStats, listUsers, reactivateUser, suspendUser } from '../../services/adminService.js';
+import {
+  approveOrganizerRequest,
+  createUser,
+  deleteUser,
+  getStats,
+  listOrganizerRequests,
+  listUsers,
+  reactivateUser,
+  rejectOrganizerRequest,
+  suspendUser,
+} from '../../services/adminService.js';
 import { listWorkshops } from '../../services/workshopService.js';
 import { listWorkshopCertificates } from '../../services/certificateService.js';
 import { Page } from '../../layouts/AppLayout.jsx';
@@ -45,6 +55,13 @@ export function AdminDashboard() {
       {error && <ErrorState error={error} onRetry={reload} />}
       {data && (
         <div className="space-y-20">
+          {data.totals.pendingOrganizerRequests > 0 && (
+            <Notice title={`${data.totals.pendingOrganizerRequests} organizer request${data.totals.pendingOrganizerRequests === 1 ? '' : 's'} waiting for approval`}>
+              <Link to="/admin/organizers" className="link-ink font-medium">
+                Review requests
+              </Link>
+            </Notice>
+          )}
           <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
             <StatTile
               label="Workshops"
@@ -175,7 +192,84 @@ function CreateUserForm({ defaultRole, onCreated, onCancel }) {
   );
 }
 
-function UsersPage({ role, title, description }) {
+// Pending organizer access requests (top of the Organizers page).
+function OrganizerRequestsSection({ onApproved }) {
+  const { data, error, loading, reload, setData } = useAsync(() => listOrganizerRequests('PENDING'), []);
+  const [busyId, setBusyId] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const action = useAction();
+
+  const decide = async (req, approve) => {
+    if (!approve && !window.confirm(`Reject the organizer request from ${req.name} (${req.email})?`)) return;
+    setNotice(null);
+    setBusyId(req.id);
+    const result = await action.run(() => (approve ? approveOrganizerRequest(req.id) : rejectOrganizerRequest(req.id)));
+    setBusyId(null);
+    if (!result.ok) return;
+    setData((list) => list.filter((r) => r.id !== req.id));
+    setNotice(approve ? result.data.message : `Rejected the request from ${req.name}.`);
+    if (approve) onApproved();
+  };
+
+  return (
+    <section className="mb-16" aria-labelledby="requests-title">
+      <SectionHeader
+        eyebrow="Requests"
+        title={`Organizer requests${data?.length ? ` · ${data.length} pending` : ''}`}
+      />
+      {notice && (
+        <Notice tone="success" className="mb-6">
+          {notice}
+        </Notice>
+      )}
+      {action.error && (
+        <Notice tone="error" className="mb-6">
+          {action.error.message}
+        </Notice>
+      )}
+      {loading && <LoadingBlock rows={1} label="Loading requests" />}
+      {error && <ErrorState error={error} onRetry={reload} />}
+      {data?.length === 0 && <p className="text-slate">No pending organizer requests.</p>}
+      {data?.length > 0 && (
+        <ul className="space-y-4">
+          {data.map((req) => (
+            <li key={req.id} className="tile flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0">
+                <p className="text-[18px] font-medium">{req.name}</p>
+                <p className="text-[15px] text-slate">
+                  {req.email} · {req.designation}
+                </p>
+                <p className="mt-3 whitespace-pre-line text-charcoal">{req.reason}</p>
+                <p className="mt-2 text-[14px] text-slate">Requested {formatDateTime(req.createdAt)}</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={busyId === req.id}
+                  onClick={() => decide(req, true)}
+                >
+                  {busyId === req.id && <Spinner />} Approve
+                  <span className="sr-only"> {req.name}</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  disabled={busyId === req.id}
+                  onClick={() => decide(req, false)}
+                >
+                  Reject<span className="sr-only"> {req.name}</span>
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function UsersPage({ role, title, description, top }) {
   const { user: me } = useAuth();
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -245,6 +339,7 @@ function UsersPage({ role, title, description }) {
           )
         }
       />
+      {top?.(() => reload({ silent: true }))}
       {adding && (
         <section className="panel mb-12">
           <h2 className="card-title mb-2">New account</h2>
@@ -375,7 +470,8 @@ export function AdminOrganizersPage() {
     <UsersPage
       role="ORGANIZER"
       title="Organizers"
-      description="Staff who run workshops. People who sign up with an @cict.in email become organizers automatically."
+      description="Staff who run workshops. New organizers are added here, or by approving an organizer request."
+      top={(reloadUsers) => <OrganizerRequestsSection onApproved={reloadUsers} />}
     />
   );
 }

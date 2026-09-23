@@ -181,11 +181,11 @@ export default function LandingPage() {
           <Eyebrow>For CICT staff</Eyebrow>
           <h2 className="section-title mt-4">Run a workshop</h2>
           <p className="mt-4 text-charcoal">
-            Sign up with your institute <span className="font-medium">@cict.in</span> email to get organizer tools:
-            build a registration form, schedule sessions, show a QR code for check-in and issue certificates.
+            Request organizer access and, once an admin approves it, you can build a registration form, schedule
+            sessions, show a QR code for check-in and issue certificates.
           </p>
-          <Link to={user ? homeFor(user) : '/register'} className="btn btn-primary mt-8">
-            {user ? 'Go to my dashboard' : 'Create an organizer account'}
+          <Link to={user ? homeFor(user) : '/request-organizer-access'} className="btn btn-primary mt-8">
+            {user ? 'Go to my dashboard' : 'Request organizer access'}
           </Link>
         </div>
         <div className="panel">

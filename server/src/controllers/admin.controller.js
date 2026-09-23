@@ -1,4 +1,5 @@
 import * as adminService from '../services/admin.service.js';
+import * as organizerRequestService from '../services/organizerRequest.service.js';
 import { parseId, validate } from '../validators/validate.js';
 import { sendCreated, sendSuccess } from '../utils/response.js';
 
@@ -24,6 +25,20 @@ export async function createUser(req, res) {
     role: { type: 'enum', required: true, label: 'Role', values: ROLES },
   });
   sendCreated(res, await adminService.createUserAccount(data), 'User created');
+}
+
+export async function listOrganizerRequests(req, res) {
+  const { status } = validate(req.query, { status: { type: 'enum', values: ['PENDING', 'APPROVED', 'REJECTED'] } });
+  sendSuccess(res, await organizerRequestService.listRequests(status));
+}
+
+export async function approveOrganizerRequest(req, res) {
+  const result = await organizerRequestService.approveRequest(parseId(req.params.id), req.user);
+  sendSuccess(res, result, `${result.user.name} is now an organizer and can sign in.`);
+}
+
+export async function rejectOrganizerRequest(req, res) {
+  sendSuccess(res, await organizerRequestService.rejectRequest(parseId(req.params.id), req.user), 'Request rejected');
 }
 
 export async function suspend(req, res) {
