@@ -431,7 +431,7 @@ export default function SessionsPage() {
                   {session.attendanceOpen && (
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-[15px] text-charcoal">
                       <StatusBadge status="OPEN" />
-                      Code <span className="font-medium tracking-[0.1em]">{session.attendanceCode}</span> · closes{' '}
+                      Code <span className="font-medium tracking-[0.1em]" data-no-translate>{session.attendanceCode}</span> · closes{' '}
                       {formatDateTime(session.attendanceExpiresAt)}
                     </p>
                   )}

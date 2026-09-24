@@ -58,7 +58,7 @@ function Result({ certificateId, token }) {
         </div>
         <p className="mt-6 text-[18px] text-charcoal">{data.reason}</p>
         <p className="mt-2 text-slate">
-          Checked ID: <span className="font-medium text-ink">{data.certificateId}</span>
+          Checked ID: <span className="font-medium text-ink" data-no-translate>{data.certificateId}</span>
         </p>
       </section>
     );

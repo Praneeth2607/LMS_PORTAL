@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { LanguageToggle } from '../context/LanguageContext.jsx';
 import { Logo } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
 import { homeFor } from '../utils/roles.js';
@@ -88,7 +89,7 @@ function NavBar() {
       >
         <Logo to={user ? homeFor(user) : '/'} />
 
-        <ul className="hidden items-center gap-1 lg:flex">
+        <ul className="nav-links hidden items-center gap-1 lg:flex">
           {items.map((item) => (
             <li key={item.to}>
               <NavItem {...item} />
@@ -96,11 +97,12 @@ function NavBar() {
           ))}
         </ul>
 
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="nav-account hidden items-center gap-2 lg:flex">
+          <LanguageToggle />
           {user ? (
             <>
-              <span className="px-2 text-right leading-tight">
-                <span className="block text-[15px] font-medium">{user.role === 'PARTICIPANT' ? firstName(user.name) : user.name}</span>
+              <span className="nav-user px-2 text-right leading-tight">
+                <span className="block text-[15px] font-medium" data-no-translate>{user.role === 'PARTICIPANT' ? firstName(user.name) : user.name}</span>
                 <span className="block text-[12px] font-bold uppercase tracking-[0.06em] text-slate">
                   {roleLabel(user.role)}
                 </span>
@@ -121,16 +123,19 @@ function NavBar() {
           )}
         </div>
 
-        <button
-          type="button"
-          className="btn btn-secondary btn-icon border-transparent lg:hidden"
-          aria-expanded={open}
-          aria-controls="mobile-menu"
-          aria-label="Open menu"
-          onClick={() => setOpen(true)}
-        >
-          <Icon name="menu" />
-        </button>
+        <div className="nav-mobile flex items-center gap-1 lg:hidden">
+          <LanguageToggle />
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon border-transparent"
+            aria-expanded={open}
+            aria-controls="mobile-menu"
+            aria-label="Open menu"
+            onClick={() => setOpen(true)}
+          >
+            <Icon name="menu" />
+          </button>
+        </div>
       </nav>
 
       {open && (
@@ -156,8 +161,8 @@ function NavBar() {
           <div className="mt-10 border-t rule px-2 pt-8">
             {user ? (
               <>
-                <p className="font-medium">{user.name}</p>
-                <p className="text-slate">{user.email}</p>
+                <p className="font-medium" data-no-translate>{user.name}</p>
+                <p className="text-slate" data-no-translate>{user.email}</p>
                 <button type="button" onClick={signOut} className="btn btn-secondary mt-6 w-full">
                   <Icon name="logout" size={18} /> Sign out
                 </button>

@@ -13,7 +13,7 @@ export function Logo({ to = '/', compact = false }) {
         <circle cx="28" cy="7" r="3.5" fill="#F37338" />
       </svg>
       {!compact && (
-        <span className="leading-none">
+        <span className="leading-none" data-no-translate>
           <span className="block text-[17px] font-semibold tracking-[-0.02em]">CICT Workshops</span>
           <span className="block text-[12px] font-bold uppercase tracking-[0.06em] text-slate">Aurex&rsquo;26</span>
         </span>

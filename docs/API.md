@@ -22,9 +22,10 @@
 8. [Session feedback](#session-feedback)
 9. [Certificates](#certificates)
 10. [Announcements](#announcements)
-11. [Admin](#admin)
-12. [Frontend integration notes](#frontend-integration-notes)
-13. [Endpoint index](#endpoint-index)
+11. [Translation (Tamil)](#translation-tamil)
+12. [Admin](#admin)
+13. [Frontend integration notes](#frontend-integration-notes)
+14. [Endpoint index](#endpoint-index)
 
 ---
 
@@ -1293,6 +1294,50 @@ Errors: `400` · `401` · `403` · `404`
 
 ---
 
+## Translation (Tamil)
+
+The website can be switched between English and Tamil with the **EN | தமிழ்** toggle in the navbar. The browser remembers the choice.
+
+Translations are stored in `server/i18n/ta.json`, which is committed with the code. Each entry maps the English text to its Tamil translation: `{ "English text": "தமிழ் உரை" }`.
+
+Numbers are replaced by placeholders before lookup, so one entry covers every count, date and time. For example, `"3 of 12 responded"` is stored as `"{0} of {1} responded"`.
+
+When the page shows text that isn't in the file yet:
+
+1. The browser sends that text here.
+2. The server translates it once with the **Google Cloud Translation API** (`GOOGLE_TRANSLATE_API_KEY`).
+3. The server adds the translation to the JSON file, so later visitors get it from the file.
+
+Without a key, texts already in the file are still translated, and new texts stay in English.
+
+### GET `/api/i18n/:lang`
+
+**Access:** Public. `:lang` must be `ta`.
+
+Response `200`: the whole dictionary, `{ "Sign in": "உள்நுழைக", "{0} of {1} responded": "…" }`.
+
+### POST `/api/i18n/:lang/translate`
+
+**Access:** Public. Limited to 60 requests per minute per IP address.
+
+Request: `{ "texts": ["Give feedback", "{0} sessions"] }`, with 1–60 texts of up to 1000 characters each.
+
+Response `200`: `{ "Give feedback": "கருத்து தெரிவிக்கவும்", … }`. The response contains only texts that could be translated.
+
+Rules:
+
+- A translation that loses a `{n}` placeholder is discarded.
+- Texts with no letters are ignored.
+
+Errors:
+
+- `400` the language isn't supported, or the list is empty or too long.
+- `429` too many requests.
+- `502` Google Translate failed.
+- `503` no API key is set and none of the texts are in the dictionary.
+
+---
+
 ## Admin
 
 All `/api/admin/*` endpoints: **Access: Admin**. Other roles get `403`.
@@ -1512,6 +1557,8 @@ Phones can't open `localhost`. Set `FRONTEND_URL` in `server/.env` to the laptop
 | GET    | `/api/workshops/:id/feedback`                | Manager     |
 | GET    | `/api/workshops/:id/feedback/questions`      | Manager     |
 | PUT    | `/api/workshops/:id/feedback/questions`      | Manager     |
+| GET    | `/api/i18n/:lang`                            | Public      |
+| POST   | `/api/i18n/:lang/translate`                  | Public      |
 | GET    | `/api/workshops/:id/attendance`              | Manager     |
 | GET    | `/api/workshops/:id/attendance/summary`      | Manager     |
 | POST   | `/api/workshops/:id/certificates/generate`   | Manager     |

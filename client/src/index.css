@@ -4,7 +4,7 @@
    Design tokens (see client/DESIGN.md — visual language only)
    ------------------------------------------------------------------ */
 @theme {
-  --font-sans: "Sofia Sans", Arial, sans-serif;
+  --font-sans: "Sofia Sans", "Noto Sans Tamil", Arial, sans-serif;
 
   --color-canvas: #f3f0ee; /* page background */
   --color-lifted: #fcfbfa; /* raised panels, forms */
@@ -373,5 +373,52 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Tamil words run longer than English: let button labels wrap and tighten the
+   desktop navbar so every page still fits (html lang is set by the toggle). */
+html[lang="ta"] body {
+  overflow-wrap: break-word; /* single long Tamil words on narrow screens */
+}
+/* Tamil glyphs are wider: scale the large headings down so words fit whole. */
+html[lang="ta"] .display {
+  font-size: clamp(30px, 3.2vw, 46px);
+  line-height: 1.15;
+  max-width: none; /* the English ch-based caps are too narrow for Tamil words */
+}
+html[lang="ta"] .page-title {
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.15;
+}
+html[lang="ta"] .section-title {
+  font-size: clamp(24px, 2.8vw, 32px);
+}
+html[lang="ta"] .btn {
+  white-space: normal;
+  text-align: center;
+}
+@media (min-width: 1024px) {
+  html[lang="ta"] nav[aria-label="Main"] a {
+    font-size: 14px;
+    padding-inline: 8px;
+  }
+}
+@media (min-width: 1024px) and (max-width: 1365px) {
+  /* not enough room for Tamil links: use the menu button, as on tablets */
+  html[lang="ta"] .nav-links,
+  html[lang="ta"] .nav-account {
+    display: none;
+  }
+  html[lang="ta"] .nav-mobile {
+    display: flex;
+  }
+  html[lang="ta"] #mobile-menu {
+    display: block;
+  }
+}
+@media (min-width: 1366px) and (max-width: 1439px) {
+  html[lang="ta"] .nav-user {
+    display: none;
   }
 }

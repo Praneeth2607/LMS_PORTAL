@@ -435,7 +435,7 @@ export function MyCertificatesPage() {
                   <dl className="mt-8 grid gap-6 border-t rule pt-6 sm:grid-cols-3">
                     <div>
                       <dt className="text-slate">Certificate ID</dt>
-                      <dd className="mt-1 font-medium">{cert.certificateId}</dd>
+                      <dd className="mt-1 font-medium" data-no-translate>{cert.certificateId}</dd>
                     </div>
                     <div>
                       <dt className="text-slate">Attendance</dt>

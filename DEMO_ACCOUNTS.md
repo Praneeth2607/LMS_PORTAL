@@ -49,6 +49,12 @@ Each person who joins counts toward the JaaS free plan's monthly active users (2
 2. As `meera@aurex26.dev` (Organizer tab), open **Full-Stack Web Development → Feedback**. It shows the average score, agreement %, response rate, a bar for each statement showing how many chose each answer, results session by session, and written feedback without names.
 3. On the same page, edit the statements under **Feedback questions**, then click **Save questions**.
 
+## Tamil demo
+
+Click **தமிழ்** in the navbar. Every page switches to Tamil, and the choice is remembered. Click **EN** to switch back.
+
+`server/i18n/ta.json` already covers every page (about 700 entries), so this works without any API key. New text added later (new workshops, new pages) is translated with Google Translate once and saved to the same file. That part needs `GOOGLE_TRANSLATE_API_KEY` in `server/.env`; without it, new text stays in English until it's added to the file.
+
 ## Quick demo path
 
 1. **Organizer:** sign in as `arjun@aurex26.dev`. Open the ML workshop, go to **Sessions**, then **Start attendance** to show the QR code.

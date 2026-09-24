@@ -1,4 +1,5 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
+import Icon from './Icon.jsx';
 
 // Labelled field wrapper with hint + error, wired for screen readers.
 // `children` is a render function receiving the control's a11y props.
@@ -42,6 +43,31 @@ export function TextField({ label, required, hint, error, className, ...inputPro
   return (
     <Field label={label} required={required} hint={hint} error={error} className={className}>
       {(control) => <input className="input" {...control} {...inputProps} />}
+    </Field>
+  );
+}
+
+// Password input with a show/hide (eye) button.
+export function PasswordField({ label, required, hint, error, className, ...inputProps }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <Field label={label} required={required} hint={hint} error={error} className={className}>
+      {(control) => (
+        <div className="relative">
+          <input className="input pr-14" {...control} {...inputProps} type={visible ? 'text' : 'password'} />
+          <button
+            type="button"
+            onClick={() => setVisible((v) => !v)}
+            aria-label={visible ? 'Hide password' : 'Show password'}
+            aria-pressed={visible}
+            aria-controls={control.id}
+            title={visible ? 'Hide password' : 'Show password'}
+            className="absolute right-1.5 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-slate hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+          >
+            <Icon name={visible ? 'eyeOff' : 'eye'} />
+          </button>
+        </div>
+      )}
     </Field>
   );
 }
