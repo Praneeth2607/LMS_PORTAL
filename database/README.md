@@ -46,6 +46,9 @@ Migrations are additive and idempotent (`ADD COLUMN IF NOT EXISTS` …), so runn
 | `002_user_suspension.sql`       | `users.suspended_at`, and the `blocked_emails` table |
 | `003_organizer_requests.sql`    | `organizer_requests` table (organizer access requests awaiting admin approval) |
 | `004_live_sessions_presence.sql` | `sessions.video_room_*`, `session_watch_logs`, attendance method `PRESENCE` |
+| `005_session_feedback.sql`       | `feedback_questions`, `session_feedback`, `feedback_answers` (+ default questions for existing workshops) |
+
+Optional demo data for an existing database: `sample_feedback.sql` adds sample feedback for the seeded Full-Stack workshop. Run it after migration 005. It's safe to run more than once.
 
 ## Demo accounts
 

@@ -47,10 +47,12 @@ export async function findById(id) {
   return camelize(rows[0]);
 }
 
-// participantId (optional) adds my_attendance_status for that participant.
+// participantId (optional) adds my_attendance_status and my_feedback_submitted
+// for that participant.
 export async function listByWorkshop(workshopId, participantId = null) {
   const { rows } = await query(
-    `SELECT ${sessionColumns('$3')}, a.status AS my_attendance_status
+    `SELECT ${sessionColumns('$3')}, a.status AS my_attendance_status,
+            EXISTS (SELECT 1 FROM session_feedback sf WHERE sf.session_id = s.id AND sf.participant_id = $2) AS my_feedback_submitted
      FROM sessions s
      LEFT JOIN attendance a ON a.session_id = s.id AND a.participant_id = $2
      WHERE s.workshop_id = $1

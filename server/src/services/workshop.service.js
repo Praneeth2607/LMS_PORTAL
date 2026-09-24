@@ -1,5 +1,6 @@
 import { withTransaction } from '../db/pool.js';
 import * as workshopRepository from '../repositories/workshop.repository.js';
+import * as feedbackRepository from '../repositories/feedback.repository.js';
 import { badRequest, conflict, forbidden, notFound } from '../utils/httpError.js';
 
 // ---- Access helpers (also used by the session, attendance, certificate and
@@ -61,6 +62,8 @@ export async function createWorkshop(data, user) {
     if (data.registrationFields?.length) {
       await workshopRepository.replaceFields(workshopId, data.registrationFields, db);
     }
+    // Every workshop starts with the default feedback questions (editable).
+    await feedbackRepository.insertDefaultQuestions(workshopId, db);
     return workshopId;
   });
   return getWorkshop(id, user);

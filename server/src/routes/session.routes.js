@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as sessionController from '../controllers/session.controller.js';
 import * as attendanceController from '../controllers/attendance.controller.js';
 import * as presenceController from '../controllers/presence.controller.js';
+import * as feedbackController from '../controllers/feedback.controller.js';
 import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth.js';
 
 // Mounted at /api/sessions.
@@ -23,5 +24,9 @@ router.post('/:id/video/join', authenticate, presenceController.join);
 router.post('/:id/heartbeat', authenticate, authorize('PARTICIPANT'), presenceController.heartbeat);
 router.get('/:id/presence', authenticate, authorize('PARTICIPANT'), presenceController.status);
 router.get('/:id/presence/participants', ...manager, presenceController.participants);
+
+// Feedback after the session (participants who attended)
+router.get('/:id/feedback', authenticate, feedbackController.sessionForm);
+router.post('/:id/feedback', authenticate, authorize('PARTICIPANT'), feedbackController.submit);
 
 export default router;

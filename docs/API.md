@@ -18,11 +18,13 @@
 4. [Registrations](#registrations)
 5. [Sessions](#sessions)
 6. [Attendance](#attendance)
-7. [Certificates](#certificates)
-8. [Announcements](#announcements)
-9. [Admin](#admin)
-10. [Frontend integration notes](#frontend-integration-notes)
-11. [Endpoint index](#endpoint-index)
+7. [Live sessions & proof of active presence](#live-sessions--proof-of-active-presence)
+8. [Session feedback](#session-feedback)
+9. [Certificates](#certificates)
+10. [Announcements](#announcements)
+11. [Admin](#admin)
+12. [Frontend integration notes](#frontend-integration-notes)
+13. [Endpoint index](#endpoint-index)
 
 ---
 
@@ -592,6 +594,7 @@ The logged-in user's workshops. **The response shape depends on role.**
 - `meetingLink`: the session's own link, falling back to the workshop's. It is `null` unless the viewer is registered or manages the workshop.
 - `attendanceOpen`: `true` while the QR/code is accepting scans (started and not expired).
 - `myAttendanceStatus`: **participants only**. `"PRESENT"`, `"ABSENT"` or `null` (not marked).
+- `myFeedbackSubmitted`: **participants only**. `true` once they have given [feedback](#session-feedback) for this session.
 - `attendanceCode`: **managers only**. The 6-character fallback code while attendance is open, otherwise `null`.
 - `attendanceOpensAt` / `attendanceClosesAt`: **managers only**. The window in which [start attendance](#post-apisessionsidattendancestart) is allowed: from the session start until 2 hours after it ends (`ATTENDANCE_CLOSE_AFTER_END_MINUTES`).
 - The QR token itself is never included; it is only returned by [start](#post-apisessionsidattendancestart).
@@ -977,6 +980,138 @@ Response `200`: the presence status fields for the session, plus `participants`:
 ```
 
 `watchingNow` is `true` when the participant's last heartbeat was within the last two intervals.
+
+---
+
+## Session feedback
+
+After a session ends, participants who were marked **PRESENT** can give feedback once. The feedback has two parts:
+
+- **Rated statements.** The organizer sets these per workshop, and they are asked after every session. Each answer is on a 5-point scale:
+
+  | Answer            | Value |
+  | ----------------- | ----- |
+  | Strongly agree    | 5     |
+  | Agree             | 4     |
+  | Neutral           | 3     |
+  | Disagree          | 2     |
+  | Strongly disagree | 1     |
+
+- **Written feedback.** Optional, up to 2000 characters.
+
+Organizers and admins only see **combined results** (averages, agreement percentage and how many chose each answer). Written comments are listed one by one, but **without the participant's identity**.
+
+Every new workshop starts with four default statements, which the organizer can edit. If a statement that already has answers is reworded or removed, it is **retired**, not deleted: its past results stay in the statistics, labelled as a retired question.
+
+### GET `/api/sessions/:id/feedback`
+
+**Access:** Auth. The feedback form for one session.
+
+Response `200`:
+
+```json
+{
+  "session": { "id": 4, "title": "Routing and Forms in React", "sessionDate": "2026-09-13", "startTime": "10:00",
+               "endTime": "12:30", "status": "COMPLETED", "workshopId": 1, "workshopTitle": "…" },
+  "questions": [{ "id": 1, "text": "The session content was clear and easy to understand.", "position": 1, "isActive": true }],
+  "scale": [{ "value": 5, "label": "Strongly agree" }, …, { "value": 1, "label": "Strongly disagree" }],
+  "eligible": true,
+  "reason": null,
+  "submitted": false,
+  "submittedAt": null
+}
+```
+
+When `eligible` is `false`, `reason` explains why. The possible reasons are:
+
+- `"Feedback opens when the session is over."`
+- `"Only participants who attended this session can give feedback."`
+- `"You are not registered for this workshop."`
+- The person isn't a participant.
+
+### POST `/api/sessions/:id/feedback`
+
+**Access:** Participant (registered, and PRESENT for this session, which must have ended).
+
+Request:
+
+```json
+{ "answers": [{ "questionId": 1, "rating": 5 }, { "questionId": 2, "rating": 4 }], "comment": "Optional written feedback" }
+```
+
+Every current question must be answered exactly once, with a rating from 1 to 5.
+
+Response `201`: `{ "submitted": true, "submittedAt": "…" }`
+
+Errors:
+
+- `400` a question is missing, a rating is outside 1–5, or a question ID is unknown.
+- `403` the participant isn't eligible.
+- `409` the participant has already given feedback for this session.
+
+### GET `/api/my-feedback/pending`
+
+**Access:** Participant.
+
+Returns finished sessions that the participant attended but hasn't given feedback on yet. The dashboard uses this list.
+
+```json
+[{ "sessionId": 9, "sessionTitle": "…", "sessionDate": "2026-09-18", "startTime": "10:00", "endTime": "12:30",
+   "workshopId": 1, "workshopTitle": "…" }]
+```
+
+### GET `/api/workshops/:id/feedback`
+
+**Access:** Manager (owner or admin). The combined results.
+
+```json
+{
+  "scale": [ … ],
+  "questions": [{ "id": 1, "text": "…", "position": 1, "isActive": true }],
+  "overall": {
+    "responses": 28, "attendees": 31, "responseRate": 90.3, "average": 3.8, "agreePercent": 65.5,
+    "questions": [{ "questionId": 1, "responses": 28, "average": 3.82, "agreePercent": 67.9,
+                    "counts": { "1": 1, "2": 2, "3": 6, "4": 11, "5": 8 } }]
+  },
+  "sessions": [{ "id": 1, "title": "…", "sessionDate": "…", "startTime": "10:00", "endTime": "12:30", "status": "COMPLETED",
+                 "attendees": 3, "responses": 3, "responseRate": 100, "average": 4.0, "agreePercent": 75,
+                 "questions": [ …same shape as overall.questions… ] }],
+  "comments": [{ "id": 17, "sessionId": 4, "sessionTitle": "…", "sessionDate": "…", "comment": "…", "submittedAt": "…" }]
+}
+```
+
+Field meanings:
+
+- `average`: the mean rating, from 1 to 5.
+- `agreePercent`: the share of answers that were Agree or Strongly agree.
+- `attendees`: participants marked PRESENT, which is everyone who could respond.
+- `responseRate`: `responses` as a percentage of `attendees`.
+
+`questions` includes the current statements plus any retired statements (`isActive: false`) that still have answers.
+
+### GET `/api/workshops/:id/feedback/questions`
+
+**Access:** Manager.
+
+Returns the current statements: `{ "questions": [{ "id", "text", "position", "isActive", "hasAnswers" }], "scale": [ … ] }`.
+
+### PUT `/api/workshops/:id/feedback/questions`
+
+**Access:** Manager.
+
+Replaces the current statements, keeping the order given:
+
+```json
+{ "questions": [{ "id": 2, "text": "I understood the key concepts." }, { "text": "A new statement" }] }
+```
+
+- Send a question's `id` to keep it, with its text changed or unchanged.
+- Leave out `id` to add a new question.
+- Leave a question out of the list to remove it.
+
+Rewording or removing a question that already has answers retires it, and a reworded question gets a new `id`. A question with no answers is changed or deleted directly. The list must have 1–10 questions, each 5–300 characters, with no duplicates.
+
+Response `200`: the same shape as the GET.
 
 ---
 
@@ -1371,6 +1506,12 @@ Phones can't open `localhost`. Set `FRONTEND_URL` in `server/.env` to the laptop
 | POST   | `/api/sessions/:id/heartbeat`                | Participant |
 | GET    | `/api/sessions/:id/presence`                 | Participant |
 | GET    | `/api/sessions/:id/presence/participants`    | Manager     |
+| GET    | `/api/sessions/:id/feedback`                 | Auth        |
+| POST   | `/api/sessions/:id/feedback`                 | Participant |
+| GET    | `/api/my-feedback/pending`                   | Participant |
+| GET    | `/api/workshops/:id/feedback`                | Manager     |
+| GET    | `/api/workshops/:id/feedback/questions`      | Manager     |
+| PUT    | `/api/workshops/:id/feedback/questions`      | Manager     |
 | GET    | `/api/workshops/:id/attendance`              | Manager     |
 | GET    | `/api/workshops/:id/attendance/summary`      | Manager     |
 | POST   | `/api/workshops/:id/certificates/generate`   | Manager     |
