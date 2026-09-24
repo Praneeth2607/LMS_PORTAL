@@ -6,6 +6,7 @@ import sessionRoutes from './session.routes.js';
 import certificateRoutes from './certificate.routes.js';
 import adminRoutes from './admin.routes.js';
 import meRoutes from './me.routes.js';
+import i18nRoutes from './i18n.routes.js';
 
 // Mounted at /api. See docs/API.md for the full contract.
 const router = Router();
@@ -16,6 +17,7 @@ router.use('/workshops', workshopRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/certificates', certificateRoutes);
 router.use('/admin', adminRoutes);
+router.use('/i18n', i18nRoutes);
 router.use('/', meRoutes);
 
 export default router;

@@ -162,6 +162,22 @@ prompt asks the person to confirm they're there.
 
 **Demo mode** (`PRESENCE_DEMO_MODE=true`) is set on the server only: heartbeats every 5s, each counting as 15 minutes.
 
+### Tamil translation
+
+```
+EN | தமிழ் toggle (LanguageContext, saved in localStorage; <html lang>)
+  → domTranslator walks the page's text nodes + placeholder/aria-label/title/alt
+  → looks each text up in the dictionary (GET /api/i18n/ta, cached in localStorage)
+      numbers become placeholders: "3 of 12 responded" → "{0} of {1} responded"
+  → missing texts are batched to POST /api/i18n/ta/translate
+      → Google Cloud Translation API (once) → saved to server/i18n/ta.json
+  → a MutationObserver translates anything React renders later (route changes, new data)
+```
+
+- **Components are unchanged.** Only text node values and attributes are rewritten, never the nodes themselves, so React keeps working. Switching back to English restores the original text.
+- **Kept in English:** anything inside `data-no-translate`, such as the logo, the signed-in user's name, emails, attendance codes and certificate IDs. Email-, URL- and ID-like tokens are also skipped automatically.
+- **Workshop content is translated too:** workshop titles, descriptions and announcements are dynamic content and go through the same dictionary.
+
 ### Session feedback
 
 ```

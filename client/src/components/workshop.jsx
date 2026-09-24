@@ -202,7 +202,7 @@ export function CertificateStatus({ entry }) {
       <div>
         <StatusBadge status="ISSUED" />
         <p className="mt-4 text-charcoal">
-          Certificate <span className="font-medium">{certificate.certificateId}</span> was issued on{' '}
+          Certificate <span className="font-medium" data-no-translate>{certificate.certificateId}</span> was issued on{' '}
           {formatDateTime(certificate.issuedAt)}.
         </p>
         <Link to={`/certificates/${certificate.certificateId}`} className="btn btn-primary mt-5">

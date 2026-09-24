@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useAction, useDocumentTitle } from '../../hooks/useUtils.js';
-import { TextAreaField, TextField, fieldErrors } from '../../components/Form.jsx';
+import { PasswordField, TextAreaField, TextField, fieldErrors } from '../../components/Form.jsx';
 import { Eyebrow, Notice, Orbit, Spinner } from '../../components/ui.jsx';
 import Icon from '../../components/Icon.jsx';
 import { destinationAfterAuth, homeFor, safeNext } from '../../utils/roles.js';
@@ -136,9 +136,8 @@ export function LoginPage() {
           error={errors.email}
           onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
         />
-        <TextField
+        <PasswordField
           label="Password"
-          type="password"
           autoComplete="current-password"
           required
           value={form.password}
@@ -207,9 +206,8 @@ export function RegisterPage() {
           error={errors.email}
           onChange={set('email')}
         />
-        <TextField
+        <PasswordField
           label="Password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}
@@ -303,9 +301,8 @@ export function OrganizerRequestPage() {
               error={errors.email}
               onChange={set('email')}
             />
-            <TextField
+            <PasswordField
               label="Password"
-              type="password"
               autoComplete="new-password"
               required
               minLength={8}

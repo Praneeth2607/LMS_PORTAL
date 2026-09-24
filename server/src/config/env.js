@@ -65,6 +65,15 @@ const env = {
     };
   })(),
 
+  // Tamil translation: Google Cloud Translation API (v2). Without a key, texts
+  // already in server/i18n/ta.json are still shown; new texts stay in English.
+  translate: {
+    apiKey: process.env.GOOGLE_TRANSLATE_API_KEY || '',
+    apiBase: process.env.GOOGLE_TRANSLATE_API_BASE || 'https://translation.googleapis.com/language/translate/v2',
+    // Folder holding <lang>.json dictionaries (default: server/i18n).
+    dictionaryDir: process.env.I18N_DIR || '',
+  },
+
   attendanceWindowMinutes: toInt(process.env.ATTENDANCE_WINDOW_MINUTES, 15),
   // Attendance can be started from a session's start time until this many
   // minutes after it ends.
