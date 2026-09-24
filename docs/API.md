@@ -523,6 +523,21 @@ Response `200`:
 
 Errors: `401` · `403` · `404`
 
+### GET `/api/workshops/:id/registrations/export`
+
+**Access:** Manager, meaning the workshop's organizer or an admin. Downloads an Excel file named `<workshop-title>-participants-YYYY-MM-DD.xlsx` with two sheets:
+
+- **Participants:** one row per registration, including cancelled ones. Columns:
+  - name, email, registration status and time registered;
+  - **one column per registration-form question**, including questions that were later removed;
+  - sessions attended, completed sessions and attendance %;
+  - certificate eligibility, certificate ID and date issued.
+- **Attendance by session:** one row per registered participant and one column per session. Each cell is Present, Absent, Not marked, or blank for a session that hasn't happened yet.
+
+Every value is written as plain data, never as a formula, so an answer such as `=HYPERLINK(…)` stays text when the file is opened in Excel.
+
+Errors: `403` if the caller isn't the organizer of this workshop or an admin.
+
 ### GET `/api/my-workshops`
 
 The logged-in user's workshops. **The response shape depends on role.**
@@ -1342,6 +1357,100 @@ Errors:
 
 All `/api/admin/*` endpoints: **Access: Admin**. Other roles get `403`.
 
+### GET `/api/admin/analytics/report`
+
+**Access:** Admin. Downloads the analytics as an A4 **PDF report with charts**, named `cict-analytics-YYYY-MM-DD.pdf`. It takes the same `workshopId`, `year` and `month` filters and uses the same data as [`GET /api/admin/analytics`](#get-apiadminanalytics). The chosen period and workshop are printed in the header.
+
+The report contains, in order:
+
+1. The headline numbers for the scope: registrations, check-ins, average attendance, average feedback and certificates.
+2. **Activity over time:** registrations and check-ins per day, week or month, as a line chart.
+3. **Attendance session by session:** one line chart per workshop with finished sessions, each with its average and the biggest drop.
+4. **Feedback satisfaction:** each workshop's average on the 1–5 scale, and the lowest-rated statements.
+5. **Organizer comparison:** a table with bars.
+
+Charts are drawn as vector graphics in the dashboard's colours. Text uses the standard PDF fonts, which cover Latin characters only, so a title written in Tamil or another script appears as "?" characters.
+
+### GET `/api/admin/users/export?role=PARTICIPANT|ORGANIZER`
+
+**Access:** Admin. Downloads an Excel file named `cict-participants-…` or `cict-organizers-…`. Leave out `role` to get one file with both sheets.
+
+- **Participants sheet:** name, email, status, date joined, registered workshops, cancelled registrations, workshops attended, sessions attended, certificates and feedback given.
+- **Organizers sheet:** name, email, role, status, date joined, published/closed/draft workshops, sessions held, registrations, certificates issued and average feedback.
+
+Errors: `400` for any other `role` value.
+
+### GET `/api/admin/analytics`
+
+**Access:** Admin. Returns the data behind the **Analytics** section of the admin dashboard. Only totals and counts are returned; no individual participant appears.
+
+Query parameters (all optional; the dashboard keeps them in its own URL as `?workshop=&year=&month=`):
+
+| Parameter    | Meaning |
+| ------------ | ------- |
+| `workshopId` | Limit everything to one workshop. |
+| `year`       | `all` for all time, or a year such as `2025`. Leave it out for the **last 12 weeks** (the default). |
+| `month`      | `1`–`12`, together with a numeric `year`. |
+
+The period decides what counts and how the activity chart groups its points:
+
+| Period          | Activity grouped by | What counts |
+| --------------- | ------------------- | ----------- |
+| Last 12 weeks   | week (12 points, weeks start Monday) | sessions held, registrations made, check-ins marked and certificates issued in those weeks |
+| A year          | month (12 points)   | the same, within that calendar year |
+| A year + month  | day (28–31 points)  | the same, within that month |
+| All time        | month, from the first activity to now | everything |
+
+Dates use `APP_TIMEZONE`.
+
+Response `200`:
+
+```json
+{
+  "scope": { "workshopId": null, "workshopTitle": null, "year": 2025, "month": null,
+             "from": "2025-01-01", "to": "2025-12-31", "unit": "month", "label": "2025" },
+  "options": { "workshops": [{ "id": 7, "title": "…" }], "years": [2026, 2025] },
+  "summary": { "registrations": 167, "checkIns": 588, "sessionsHeld": 21, "attendanceRate": 77.4,
+               "feedbackResponses": 343, "feedbackAverage": 3.99, "certificates": 46 },
+  "sessionAttendance": [
+    { "workshopId": 7, "title": "…", "registered": 39,
+      "sessions": [{ "number": 1, "id": 31, "title": "…", "sessionDate": "2025-09-29", "startTime": "10:00",
+                     "present": 34, "registered": 39, "rate": 87.2 }] }
+  ],
+  "activity": [{ "start": "2025-01-01", "registrations": 0, "checkIns": 0 }],
+  "feedback": {
+    "workshops": [{ "workshopId": 7, "title": "…", "responses": 121, "average": 3.44, "agreePercent": 44.6 }],
+    "lowestStatements": [{ "questionId": 28, "text": "…", "workshopId": 7, "workshopTitle": "…",
+                           "answers": 121, "average": 2.7, "agreePercent": 9.9 }]
+  },
+  "organizers": [{ "id": 12, "name": "Prof. Suresh Babu", "role": "ORGANIZER", "workshops": 1, "completedSessions": 8,
+                   "attendanceRate": 67, "feedbackAverage": 3.44, "feedbackAnswers": 484, "certificates": 2 }]
+}
+```
+
+- **`scope`:** the filters as the server understood them. `label` is shown to people, for example "Last 12 weeks", "2025", "March 2026" or "All time".
+- **`options`:** the choices for the filter controls. It lists non-draft workshops and every year that has activity.
+- **`summary`:** headline numbers for the scope.
+  - `attendanceRate` is present ÷ registered, pooled over the finished sessions.
+  - `feedbackAverage` is weighted by responses.
+- **`sessionAttendance`**
+  - Covers finished sessions of non-draft workshops within the scope.
+  - `number` is the session's position in its workshop's full schedule.
+  - `rate` = `present` ÷ `registered` × 100, counting only participants who are still registered.
+- **`activity`:** one point per day, week or month (see `scope.unit`), oldest first.
+  - `registrations` counts new registrations.
+  - `checkIns` counts attendance marked PRESENT.
+- **`feedback`**
+  - Covers feedback on sessions within the scope.
+  - `average` is the mean rating from 1 to 5.
+  - `agreePercent` is the share of answers that were Agree or Strongly agree.
+  - `lowestStatements` lists up to 5 statements with at least 3 answers, lowest average first.
+- **`organizers`**
+  - Covers everyone with the ORGANIZER role, plus anyone else who created a workshop. When a filter is set, only organizers with activity in the scope are listed.
+  - `attendanceRate` is total present ÷ total possible across their finished sessions. It is `null` when there are none.
+
+Errors: `400` for an invalid `workshopId`, `year` or `month`, or a `month` given without a numeric `year`.
+
 ### GET `/api/admin/stats`
 
 Response `200`:
@@ -1570,6 +1679,10 @@ Phones can't open `localhost`. Set `FRONTEND_URL` in `server/.env` to the laptop
 | GET    | `/api/workshops/:id/announcements`           | Optional    |
 | POST   | `/api/workshops/:id/announcements`           | Manager     |
 | GET    | `/api/admin/stats`                           | Admin       |
+| GET    | `/api/admin/analytics`                       | Admin       |
+| GET    | `/api/admin/analytics/report`                | Admin       |
+| GET    | `/api/admin/users/export`                    | Admin       |
+| GET    | `/api/workshops/:id/registrations/export`    | Manager     |
 | GET    | `/api/admin/users`                           | Admin       |
 | POST   | `/api/admin/users`                           | Admin       |
 | PATCH  | `/api/admin/users/:id/suspend`               | Admin       |

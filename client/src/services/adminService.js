@@ -1,6 +1,8 @@
 import { api, request, toQuery } from './api.js';
 
 export const getStats = () => api.get('/admin/stats');
+// params: { workshopId, year ('all' | YYYY), month (1–12) }
+export const getAnalytics = (params) => api.get(`/admin/analytics${toQuery(params)}`);
 // params: { role, search }
 export const listUsers = (params) => api.get(`/admin/users${toQuery(params)}`);
 export const createUser = (data) => api.post('/admin/users', data);

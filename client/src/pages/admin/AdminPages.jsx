@@ -40,6 +40,8 @@ import {
   workshopDisplayStatus,
 } from '../../utils/format.js';
 import { manageWorkshopPath } from '../../utils/roles.js';
+import AdminAnalytics from './AdminAnalytics.jsx';
+import DownloadButton from '../../components/DownloadButton.jsx';
 
 // ======================================================================
 // Dashboard (numbers straight from GET /api/admin/stats)
@@ -72,6 +74,8 @@ export function AdminDashboard() {
             <StatTile label="Registrations" value={data.totals.registrations} hint={`${data.totals.sessions} sessions scheduled`} />
             <StatTile label="Certificates" value={data.totals.certificates} hint={`${data.totals.attendanceMarked} check-ins recorded`} />
           </div>
+
+          <AdminAnalytics />
 
           <section>
             <SectionHeader
@@ -113,7 +117,7 @@ export function AdminDashboard() {
                       </td>
                       <td data-label="Registered">{w.registeredCount}</td>
                       <td data-label="Sessions">{w.sessionCount}</td>
-                      <td data-label="Avg. attendance">{w.sessionCount && w.registeredCount ? formatPercent(w.averageAttendance) : '–'}</td>
+                      <td data-label="Avg. attendance">{w.completedSessionCount && w.registeredCount ? formatPercent(w.averageAttendance) : '–'}</td>
                       <td data-label="Certificates">{w.certificateCount}</td>
                     </tr>
                   ))}
@@ -332,11 +336,17 @@ function UsersPage({ role, title, description, top }) {
         title={title}
         description={description}
         actions={
-          !adding && (
-            <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
-              <Icon name="plus" size={18} /> Add {roleLabel(role).toLowerCase()}
-            </button>
-          )
+          <div className="flex flex-wrap items-start gap-3">
+            <DownloadButton
+              path={`/admin/users/export?role=${role}`}
+              filename={role === 'ORGANIZER' ? 'cict-organizers.xlsx' : 'cict-participants.xlsx'}
+            />
+            {!adding && (
+              <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
+                <Icon name="plus" size={18} /> Add {roleLabel(role).toLowerCase()}
+              </button>
+            )}
+          </div>
         }
       />
       {top?.(() => reload({ silent: true }))}

@@ -46,6 +46,7 @@ import {
   workshopDisplayStatus,
 } from '../../utils/format.js';
 import { manageWorkshopPath } from '../../utils/roles.js';
+import DownloadButton from '../../components/DownloadButton.jsx';
 
 const createAction = (
   <Link to="/organizer/workshops/create" className="btn btn-primary">
@@ -530,7 +531,16 @@ export function ParticipantsPage() {
 
   return (
     <div>
-      <SectionHeader eyebrow="Participants" title="Registrations" />
+      <SectionHeader
+        eyebrow="Participants"
+        title="Registrations"
+        action={
+          <DownloadButton
+            path={`/workshops/${workshop.id}/registrations/export`}
+            filename="participants.xlsx"
+          />
+        }
+      />
       <div role="group" aria-label="Filter registrations" className="mb-8 flex flex-wrap gap-2">
         {[
           ['REGISTERED', 'Registered'],

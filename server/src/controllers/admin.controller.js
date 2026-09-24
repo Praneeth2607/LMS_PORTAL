@@ -1,5 +1,8 @@
 import * as adminService from '../services/admin.service.js';
 import * as organizerRequestService from '../services/organizerRequest.service.js';
+import * as analyticsService from '../services/analytics.service.js';
+import * as exportService from '../services/export.service.js';
+import * as analyticsReportService from '../services/analyticsReport.service.js';
 import { parseId, validate } from '../validators/validate.js';
 import { sendCreated, sendSuccess } from '../utils/response.js';
 
@@ -7,6 +10,20 @@ const ROLES = ['ADMIN', 'ORGANIZER', 'PARTICIPANT'];
 
 export async function stats(req, res) {
   sendSuccess(res, await adminService.getStats());
+}
+
+export async function analytics(req, res) {
+  sendSuccess(res, await analyticsService.getAnalytics(req.query));
+}
+
+// Downloads: analytics as a PDF report with charts; people lists as Excel
+export async function analyticsReport(req, res) {
+  analyticsReportService.sendPdf(res, await analyticsReportService.analyticsReport(req.query));
+}
+
+export async function exportUsers(req, res) {
+  const role = req.query.role ? String(req.query.role).toUpperCase() : null;
+  exportService.sendWorkbook(res, await exportService.peopleWorkbook(role));
 }
 
 export async function listUsers(req, res) {

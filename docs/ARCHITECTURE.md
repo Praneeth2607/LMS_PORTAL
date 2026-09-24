@@ -162,6 +162,35 @@ prompt asks the person to confirm they're there.
 
 **Demo mode** (`PRESENCE_DEMO_MODE=true`) is set on the server only: heartbeats every 5s, each counting as 15 minutes.
 
+### Admin analytics
+
+The admin dashboard has four charts, all fed by `GET /api/admin/analytics`. All counting happens in SQL, in `analytics.repository.js`.
+
+| Chart | Form | Answers the question |
+| --- | --- | --- |
+| Attendance session by session | line (one workshop at a time) | Where do participants stop coming? |
+| Activity over time | two lines, one count axis | Is the portal getting busier? |
+| Feedback satisfaction | dot plot on the true 1–5 scale, plus a list of the lowest-rated statements | Which workshops and statements need attention? |
+| Organizer comparison | table with inline meters | How do organizers compare? Its measures have different units, so it is a table rather than a chart with a second axis. |
+
+- **Chart code:** the charts are hand-built SVG in `components/charts.jsx`, with no charting library.
+- **Colours:** `--chart-1` is the brand orange and `--chart-2` is blue. The pair passes colour-blind separation (ΔE ≥ 27) and 3:1 contrast on white.
+- **Interaction:** every chart has a hover and keyboard (arrow keys) tooltip, plus a "View as table" option.
+- **Tamil:** labels are split into generic pieces (for example "Session", "Week of" and a date), so the Tamil dictionary covers every workshop.
+
+### Downloads (PDF report and Excel)
+
+- **Analytics report:** `analyticsReport.service.js` draws an A4 PDF with **pdf-lib**. The line charts, dot plot and meters are drawn as vector shapes in the dashboard's colours, and every workshop with finished sessions gets its own attendance chart. The report paginates, and each page has a numbered footer.
+- **People lists and workshop participants:** these are Excel files, described below.
+
+### Excel exports
+
+- **Where the files come from:** `export.service.js` builds `.xlsx` workbooks with **exceljs** on the server. The browser saves the file under the name the server gives it (`DownloadButton.jsx`).
+- **Workbook format:** each sheet has a bold, frozen header row with filters, and real dates and numbers, so the files sort and filter properly in Excel.
+- **Access:** the analytics report and people lists are admin-only. A workshop's participant list is available to its organizer and to admins.
+- **Formula safety:** every value is written as data. User-typed text that starts with "=" is not run as a formula when the file is opened.
+- **Dependency note:** exceljs pulls in `uuid@8`, which has an advisory (GHSA-w5hq-g745-h8pq) for its v3/v5/v6 functions when a buffer is passed. exceljs only calls `v4()`, so the advisory doesn't apply.
+
 ### Tamil translation
 
 ```

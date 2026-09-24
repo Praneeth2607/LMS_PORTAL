@@ -1,4 +1,5 @@
 import * as registrationService from '../services/registration.service.js';
+import * as exportService from '../services/export.service.js';
 import { validateRegistrationQuery } from '../validators/registration.validator.js';
 import { parseId } from '../validators/validate.js';
 import { sendCreated, sendSuccess } from '../utils/response.js';
@@ -20,4 +21,9 @@ export async function listForWorkshop(req, res) {
 
 export async function myWorkshops(req, res) {
   sendSuccess(res, await registrationService.myWorkshops(req.user));
+}
+
+// GET /api/workshops/:id/registrations/export → .xlsx (organizer of the workshop or admin)
+export async function exportForWorkshop(req, res) {
+  exportService.sendWorkbook(res, await exportService.workshopParticipantsWorkbook(parseId(req.params.id), req.user));
 }

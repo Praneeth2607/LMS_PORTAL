@@ -7,6 +7,9 @@ const router = Router();
 router.use(authenticate, authorize('ADMIN'));
 
 router.get('/stats', adminController.stats);
+router.get('/analytics', adminController.analytics);
+router.get('/analytics/report', adminController.analyticsReport);
+router.get('/users/export', adminController.exportUsers);
 router.get('/users', adminController.listUsers);
 router.post('/users', adminController.createUser);
 router.patch('/users/:id/suspend', adminController.suspend);

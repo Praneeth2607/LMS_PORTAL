@@ -1,6 +1,8 @@
-// Recreates the database from database/schema.sql and loads database/seed.sql.
-// Creates the database first if it does not exist. DESTROYS ALL DATA.
-//   npm run db:reset              schema + seed
+// Recreates the database from database/schema.sql and loads database/seed.sql
+// plus database/demo_data.sql. Creates the database first if it does not exist.
+// DESTROYS ALL DATA.
+//   npm run db:reset              schema + seed + demo data
+//   npm run db:reset -- --no-demo schema + seed only
 //   npm run db:reset -- --no-seed schema only
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +11,7 @@ import env from '../config/env.js';
 
 const databaseDir = fileURLToPath(new URL('../../../database/', import.meta.url));
 const withSeed = !process.argv.includes('--no-seed');
+const withDemo = withSeed && !process.argv.includes('--no-demo');
 
 // Connection failures arrive as an AggregateError with an empty message.
 const describe = (err) =>
@@ -52,6 +55,10 @@ async function run() {
     if (withSeed) {
       await client.query(await readFile(`${databaseDir}seed.sql`, 'utf8'));
       console.log('Applied seed.sql');
+    }
+    if (withDemo) {
+      await client.query(await readFile(`${databaseDir}demo_data.sql`, 'utf8'));
+      console.log('Applied demo_data.sql');
     }
   } finally {
     await client.end();
