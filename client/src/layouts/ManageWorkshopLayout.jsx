@@ -11,6 +11,7 @@ const SECTIONS = [
   { to: 'participants', label: 'Participants' },
   { to: 'sessions', label: 'Sessions' },
   { to: 'attendance', label: 'Attendance & certificates' },
+  { to: 'feedback', label: 'Feedback' },
   { to: 'announcements', label: 'Announcements' },
   { to: 'edit', label: 'Edit details' },
 ];

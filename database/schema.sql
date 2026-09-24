@@ -9,7 +9,7 @@
 
 BEGIN;
 
-DROP TABLE IF EXISTS session_watch_logs, organizer_requests, blocked_emails, certificates, announcements, attendance, sessions,
+DROP TABLE IF EXISTS feedback_answers, session_feedback, feedback_questions, session_watch_logs, organizer_requests, blocked_emails, certificates, announcements, attendance, sessions,
                      registrations, registration_fields, workshops, users CASCADE;
 
 -- Keeps updated_at current on UPDATE.
@@ -185,6 +185,42 @@ CREATE TABLE session_watch_logs (
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (session_id, participant_id)
 );
+
+-- ---------------------------------------------------------------------
+-- Session feedback
+--   feedback_questions : Likert statements set by the organizer (per workshop).
+--                        Answered questions are archived (is_active = FALSE),
+--                        never deleted, so past statistics stay correct.
+--   session_feedback   : one anonymous submission per participant per session
+--                        (only participants marked PRESENT may submit).
+--   feedback_answers   : 5 Strongly agree … 1 Strongly disagree.
+-- ---------------------------------------------------------------------
+CREATE TABLE feedback_questions (
+  id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  workshop_id    INTEGER      NOT NULL REFERENCES workshops(id) ON DELETE CASCADE,
+  question_text  VARCHAR(300) NOT NULL,
+  position       INTEGER      NOT NULL DEFAULT 0,
+  is_active      BOOLEAN      NOT NULL DEFAULT TRUE,
+  created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_feedback_questions_workshop ON feedback_questions(workshop_id);
+
+CREATE TABLE session_feedback (
+  id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  session_id      INTEGER     NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  participant_id  INTEGER     NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+  comment         TEXT,
+  submitted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (session_id, participant_id)
+);
+
+CREATE TABLE feedback_answers (
+  feedback_id  INTEGER  NOT NULL REFERENCES session_feedback(id)   ON DELETE CASCADE,
+  question_id  INTEGER  NOT NULL REFERENCES feedback_questions(id) ON DELETE CASCADE,
+  rating       SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  PRIMARY KEY (feedback_id, question_id)
+);
+CREATE INDEX idx_feedback_answers_question ON feedback_answers(question_id);
 
 -- ---------------------------------------------------------------------
 -- announcements

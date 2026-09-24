@@ -191,7 +191,16 @@ function ParticipantPanel({ join, inCall, onActivityRef }) {
     initialStatus: join.presence,
   });
   onActivityRef.current = presence.markActivity;
-  return <ActiveSessionTracker presence={presence} inCall={inCall} liveState={liveState} />;
+  return (
+    <>
+      <ActiveSessionTracker presence={presence} inCall={inCall} liveState={liveState} />
+      {liveState === 'ENDED' && (
+        <Link to={`/participant/sessions/${join.session.id}/feedback`} className="btn btn-primary w-full">
+          Give feedback on this session
+        </Link>
+      )}
+    </>
+  );
 }
 
 // /sessions/:id/live: the session's video call inside the portal.

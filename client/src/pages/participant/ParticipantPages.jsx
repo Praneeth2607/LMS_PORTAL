@@ -7,6 +7,7 @@ import { listSessions } from '../../services/sessionService.js';
 import { listAnnouncements } from '../../services/announcementService.js';
 import { getWorkshop } from '../../services/workshopService.js';
 import { myCertificates } from '../../services/certificateService.js';
+import { listPendingFeedback } from '../../services/feedbackService.js';
 import { Page } from '../../layouts/AppLayout.jsx';
 import {
   BackLink,
@@ -54,7 +55,7 @@ const browseAction = (
 // Dashboard
 // ======================================================================
 async function loadDashboard() {
-  const entries = await myWorkshops();
+  const [entries, pendingFeedback] = await Promise.all([myWorkshops(), listPendingFeedback().catch(() => [])]);
   const active = entries.filter((e) => e.registrationStatus === 'REGISTERED');
   // Sessions and announcements are per workshop in the API.
   const perWorkshop = await Promise.all(
@@ -76,7 +77,7 @@ async function loadDashboard() {
     .flatMap(({ entry, announcements: list }) => list.map((a) => ({ ...a, workshopTitle: entry.workshop.title })))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 4);
-  return { entries, active, upcoming, announcements };
+  return { entries, active, upcoming, announcements, pendingFeedback: pendingFeedback.slice(0, 3) };
 }
 
 export function ParticipantDashboard() {
@@ -105,6 +106,31 @@ export function ParticipantDashboard() {
             <StatTile label="Upcoming sessions" value={data.upcoming.length} hint={data.upcoming.length === 5 ? 'Next five shown' : undefined} />
             <StatTile label="Certificates" value={data.entries.filter((e) => e.certificate).length} />
           </div>
+
+          {data.pendingFeedback.length > 0 && (
+            <section aria-labelledby="feedback-title" className="panel bg-white">
+              <Eyebrow>Feedback</Eyebrow>
+              <h2 id="feedback-title" className="card-title mt-4">
+                How did these sessions go?
+              </h2>
+              <p className="mt-2 text-charcoal">Two minutes of feedback helps the organizer improve the next session.</p>
+              <ul className="mt-6 divide-y divide-ink/10">
+                {data.pendingFeedback.map((s) => (
+                  <li key={s.sessionId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-medium">{s.sessionTitle}</p>
+                      <p className="text-[14px] text-slate">
+                        {s.workshopTitle} · {formatDate(s.sessionDate)}
+                      </p>
+                    </div>
+                    <Link to={`/participant/sessions/${s.sessionId}/feedback`} className="btn btn-primary shrink-0">
+                      Give feedback
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section aria-labelledby="upcoming-title">
             <SectionHeader eyebrow="Sessions" title="Coming up" />

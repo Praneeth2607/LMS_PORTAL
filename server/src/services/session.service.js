@@ -16,7 +16,7 @@ export function attendanceWindow(session) {
 // meeting links from people who are not registered.
 function present(session, workshop, user) {
   const manager = canManage(workshop, user);
-  const { attendanceToken, attendanceCode, myAttendanceStatus, videoRoomName, videoRoomUrl, ...rest } = session;
+  const { attendanceToken, attendanceCode, myAttendanceStatus, myFeedbackSubmitted, videoRoomName, videoRoomUrl, ...rest } = session;
   return {
     ...rest,
     meetingLink: canSeeMeetingLink(workshop, user) ? session.meetingLink || workshop.meetingLink : null,
@@ -27,7 +27,10 @@ function present(session, workshop, user) {
       attendanceOpensAt: attendanceWindow(session).opensAt,
       attendanceClosesAt: attendanceWindow(session).closesAt,
     }),
-    ...(user?.role === 'PARTICIPANT' && { myAttendanceStatus: myAttendanceStatus ?? null }),
+    ...(user?.role === 'PARTICIPANT' && {
+      myAttendanceStatus: myAttendanceStatus ?? null,
+      myFeedbackSubmitted: Boolean(myFeedbackSubmitted),
+    }),
   };
 }
 

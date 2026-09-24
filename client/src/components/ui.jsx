@@ -94,6 +94,7 @@ const STATUS = {
   SUSPENDED: ['Suspended', 'muted'],
   OPEN: ['Attendance open', 'accent'],
   WATCHING: ['Watching now', 'accent'],
+  FEEDBACK_SENT: ['Feedback sent', 'muted'],
   NOT_MARKED: ['Not marked', 'muted'],
   ADMIN: ['Admin', 'strong'],
   ORGANIZER: ['Organizer', 'neutral'],

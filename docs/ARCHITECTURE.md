@@ -162,6 +162,21 @@ prompt asks the person to confirm they're there.
 
 **Demo mode** (`PRESENCE_DEMO_MODE=true`) is set on the server only: heartbeats every 5s, each counting as 15 minutes.
 
+### Session feedback
+
+```
+Session ends (status COMPLETED)
+  → participants marked PRESENT see "Give feedback" (dashboard, workshop page, live room)
+  → GET  /sessions/:id/feedback     form: organizer's statements + 5-point scale
+  → POST /sessions/:id/feedback     one response per participant per session (UNIQUE)
+  → GET  /workshops/:id/feedback    organizer/admin: averages, agreement %, distribution,
+                                    response rate per statement and per session, anonymous comments
+```
+
+- Tables: `feedback_questions` (per workshop, `is_active`), `session_feedback` (one row per response, optional comment), and `feedback_answers` (rating 1–5 per statement).
+- Statistics are calculated in `feedback.service.js` from rating counts, so no individual answers leave the database.
+- Statements that already have answers are archived rather than edited, so past averages always describe the statement that was actually asked.
+
 ### QR attendance (in-person)
 
 ```

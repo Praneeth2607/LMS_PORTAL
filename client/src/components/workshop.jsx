@@ -91,6 +91,7 @@ export function SessionList({ sessions, participantView = false }) {
               <StatusBadge status={session.myAttendanceStatus || (sessionPast(session) ? 'NOT_MARKED' : 'UPCOMING')} />
             )}
             {participantView && <JoinButton session={session} />}
+            {participantView && <FeedbackAction session={session} />}
             {participantView && session.attendanceOpen && session.myAttendanceStatus !== 'PRESENT' && (
               <Link to={`/attendance/${session.id}`} className="btn btn-primary">
                 Mark attendance
@@ -104,6 +105,19 @@ export function SessionList({ sessions, participantView = false }) {
 }
 
 const sessionPast = (s) => new Date(`${s.sessionDate}T${s.endTime}:00`) < new Date();
+
+// ---------------------------------------------------------------- Feedback (participant)
+// After a session they attended is over: "Give feedback", or a note that it was sent.
+export function FeedbackAction({ session }) {
+  if (sessionLiveStatus(session) !== 'COMPLETED' || session.myAttendanceStatus !== 'PRESENT') return null;
+  if (session.myFeedbackSubmitted) return <StatusBadge status="FEEDBACK_SENT" />;
+  return (
+    <Link to={`/participant/sessions/${session.id}/feedback`} className="btn btn-secondary">
+      <Icon name="edit" size={18} /> Give feedback
+      <span className="sr-only"> for {session.title}</span>
+    </Link>
+  );
+}
 
 // ---------------------------------------------------------------- Join (participant)
 // Online/hybrid sessions: opens the live room inside the portal (where watch

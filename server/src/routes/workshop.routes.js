@@ -5,6 +5,7 @@ import * as sessionController from '../controllers/session.controller.js';
 import * as attendanceController from '../controllers/attendance.controller.js';
 import * as certificateController from '../controllers/certificate.controller.js';
 import * as announcementController from '../controllers/announcement.controller.js';
+import * as feedbackController from '../controllers/feedback.controller.js';
 import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth.js';
 
 // Mounted at /api/workshops. Ownership (organizer of THIS workshop) is checked
@@ -42,5 +43,10 @@ router.get('/:id/certificates', ...manager, certificateController.listForWorksho
 // Announcements
 router.get('/:id/announcements', optionalAuthenticate, announcementController.list);
 router.post('/:id/announcements', ...manager, announcementController.create);
+
+// Session feedback (questions + aggregated results)
+router.get('/:id/feedback', ...manager, feedbackController.workshopFeedback);
+router.get('/:id/feedback/questions', ...manager, feedbackController.getQuestions);
+router.put('/:id/feedback/questions', ...manager, feedbackController.saveQuestions);
 
 export default router;

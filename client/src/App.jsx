@@ -33,6 +33,8 @@ import {
 } from './pages/organizer/OrganizerPages.jsx';
 import SessionsPage from './pages/organizer/SessionsPage.jsx';
 import AttendanceOverviewPage from './pages/organizer/AttendanceOverviewPage.jsx';
+import FeedbackPage from './pages/organizer/FeedbackPage.jsx';
+import SessionFeedbackPage from './pages/participant/SessionFeedbackPage.jsx';
 
 import {
   AdminCertificatesPage,
@@ -82,6 +84,7 @@ export default function App() {
             <Route path="dashboard" element={<ParticipantDashboard />} />
             <Route path="workshops" element={<MyWorkshopsPage />} />
             <Route path="workshops/:id" element={<MyWorkshopDetailPage />} />
+            <Route path="sessions/:id/feedback" element={<SessionFeedbackPage />} />
             <Route path="certificates" element={<MyCertificatesPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
@@ -98,6 +101,7 @@ export default function App() {
               <Route path="participants" element={<ParticipantsPage />} />
               <Route path="sessions" element={<SessionsPage />} />
               <Route path="attendance" element={<AttendanceOverviewPage />} />
+              <Route path="feedback" element={<FeedbackPage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />
             </Route>
           </Route>
