@@ -48,7 +48,18 @@ Migrations are additive and idempotent (`ADD COLUMN IF NOT EXISTS` …), so runn
 | `004_live_sessions_presence.sql` | `sessions.video_room_*`, `session_watch_logs`, attendance method `PRESENCE` |
 | `005_session_feedback.sql`       | `feedback_questions`, `session_feedback`, `feedback_answers` (+ default questions for existing workshops) |
 
-Optional demo data for an existing database: `sample_feedback.sql` adds sample feedback for the seeded Full-Stack workshop. Run it after migration 005. It's safe to run more than once.
+**Demo data (`demo_data.sql`).** This adds about 15 months of realistic activity:
+
+- 3 more organizers and 72 students;
+- 12 workshops (10 finished, 2 upcoming), with sessions, registrations and attendance that drops off over each course;
+- feedback with written comments, certificates and announcements.
+
+Dates are relative to today, and running the file again does nothing.
+
+- `npm run db:reset` loads it automatically; use `--no-demo` to skip it.
+- On Supabase, run it in the SQL editor after migration 005.
+
+`sample_feedback.sql` (sample feedback for the seeded Full-Stack workshop) is also optional, and also safe to re-run.
 
 ## Demo accounts
 

@@ -29,6 +29,24 @@ These accounts come from `database/seed.sql`. They are available after running `
 | Sneha Patel  | `sneha@aurex26.dev`   | Registered for ML and Cybersecurity: live QR check-in         |
 | Vikram Singh | `vikram@aurex26.dev`  | Not registered anywhere: live registration                    |
 
+## Demo data accounts (`database/demo_data.sql`)
+
+All use the password `Password@123`.
+
+| Role        | Email |
+| ----------- | ----- |
+| Organizer   | `kavitha@aurex26.dev` (Python, Android, Power BI) |
+| Organizer   | `suresh@aurex26.dev` (Data Structures, Competitive Programming, Blockchain) |
+| Organizer   | `nisha@aurex26.dev` (Git & GitHub, UI/UX, Linux) |
+| Participant | 72 students, for example `aarav.kumar@student.aurex26.dev` or `zoya.khan@student.aurex26.dev` (`first.last@student.aurex26.dev`) |
+
+**Analytics demo.** Sign in as the admin and use the filters above the charts.
+
+1. **Year → 2025, then All time:** the activity chart switches from months to the whole history.
+2. **Year → this year, Month → March:** the chart shows one point per day.
+3. **Workshop → Data Structures & Algorithms Bootcamp:** attendance falls from about 87% to 49% across the 8 sessions, and "The pace of the session was right for me" is its lowest-rated statement.
+4. **Download PDF report:** the PDF uses the filters you picked.
+
 ## Live session demo (proof of active presence)
 
 1. In `server/.env`, set the `JAAS_*` keys (see `server/.env.example`) and, **for the demo only**, `PRESENCE_DEMO_MODE=true` (5 seconds counts as 15 minutes). Restart the server.

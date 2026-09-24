@@ -25,6 +25,15 @@
   --shadow-lift: 0px 24px 48px 0px rgba(0, 0, 0, 0.08);
 }
 
+/* Chart colours (validated: colour-blind separation + 3:1 contrast on white). */
+:root {
+  --chart-1: #cf4500; /* brand orange: single series, series 1 */
+  --chart-1-track: #f6ddd0; /* lighter step of chart-1 for meter tracks */
+  --chart-2: #2a78d6; /* series 2 */
+  --chart-grid: #ece8e3; /* hairline gridlines */
+  --chart-axis: #d1cdc7; /* baseline, crosshair, ticks */
+}
+
 @layer base {
   html {
     background: var(--color-canvas);

@@ -6,7 +6,8 @@ import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
-app.use(cors({ origin: env.frontendUrl, credentials: true }));
+// Content-Disposition is exposed so the browser can read download file names.
+app.use(cors({ origin: env.frontendUrl, credentials: true, exposedHeaders: ['Content-Disposition'] }));
 app.use(express.json({ limit: '1mb' }));
 
 app.use('/api', apiRoutes);

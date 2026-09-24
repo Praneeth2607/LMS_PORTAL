@@ -114,6 +114,14 @@ export async function requestBlob(path) {
   return res.blob();
 }
 
+// For file downloads: the Blob plus the filename the server suggests.
+export async function requestFile(path) {
+  const res = await send(path);
+  if (!res.ok) throw await toError(res);
+  const match = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '');
+  return { blob: await res.blob(), filename: match ? match[1] : null };
+}
+
 // Shorthands returning only `data`.
 export const api = {
   get: async (path) => (await request(path)).data,

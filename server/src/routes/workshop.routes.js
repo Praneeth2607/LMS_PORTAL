@@ -27,6 +27,7 @@ router.patch('/:id/close', ...manager, workshopController.close);
 router.post('/:id/register', ...participant, registrationController.register);
 router.delete('/:id/register', ...participant, registrationController.cancel);
 router.get('/:id/registrations', ...manager, registrationController.listForWorkshop);
+router.get('/:id/registrations/export', ...manager, registrationController.exportForWorkshop);
 
 // Sessions
 router.get('/:id/sessions', optionalAuthenticate, sessionController.listForWorkshop);
