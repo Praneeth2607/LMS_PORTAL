@@ -4,7 +4,7 @@
 > Build the frontend against this document only. Any change to an endpoint is made here first.
 
 - **Base URL (dev):** `/api`. The Vite dev server proxies `/api` to `http://localhost:5000`.
-- **Format:** JSON in, JSON out (`Content-Type: application/json`). The only exception is the certificate PDF download.
+- **Format:** JSON in, JSON out (`Content-Type: application/json`). The exceptions are file downloads: certificate PDFs, the analytics PDF report and Excel exports.
 - **Naming:** JSON keys are `camelCase`. Enum values are `UPPERCASE`.
 - **Dates:** date-only fields are `"YYYY-MM-DD"`. Times are `"HH:MM"` (24h). Timestamps (`createdAt`, `markedAt`, …) are ISO 8601 UTC strings.
 - **IDs:** integers, except `certificateId`, which is a string such as `"CICT26-KB7F2E3U"`.
@@ -262,8 +262,8 @@ Returned by list, detail, create, update, publish and close.
 }
 ```
 
-- `meetingLink` is `null` unless the viewer manages the workshop or is registered for it. Use this to
-  show "Register to get the meeting link".
+- `meetingLink` is an optional backup link (online and hybrid sessions run live inside the portal). It is `null`
+  unless the viewer manages the workshop or is registered for it.
 - `isRegistered`: the viewer has an active registration (always `false` for guests, organizers and admins).
 - `canManage`: the viewer may edit it and see its registrations, attendance and certificates. Use it to show organizer controls.
 - `capacity`: `null` means unlimited. Seats left = `capacity - registeredCount`.
@@ -395,10 +395,8 @@ Errors:
 
 Sets status to `PUBLISHED`, which makes it visible and opens registration. Also re-opens a `CLOSED` workshop.
 
-Before publishing, the workshop must have:
-
-- a `venue`, if the mode is `OFFLINE` or `HYBRID`;
-- a `meetingLink`, if the mode is `ONLINE` or `HYBRID`.
+Before publishing, an `OFFLINE` or `HYBRID` workshop must have a `venue`. Online workshops need no meeting link:
+their sessions run in the portal's live room.
 
 **Access:** Manager (owner or admin)
 
@@ -406,7 +404,7 @@ Request body: none.
 
 Response `200` (message `"Workshop published"`): workshop object.
 
-Errors: `400` `"Workshop is not ready to publish"` with `errors: [{ field: "venue" | "meetingLink", ... }]` · `401` · `403` · `404`
+Errors: `400` `"Workshop is not ready to publish"` with `errors: [{ field: "venue", ... }]` · `401` · `403` · `404`
 
 ### PATCH `/api/workshops/:id/close`
 
@@ -666,8 +664,8 @@ Errors: `400` · `401` · `403` · `404`
 
 The organizer starts the session, which makes it `ONGOING`. Allowed from the scheduled start time until the end time, and
 checked against the server clock. Pressing it again while `ONGOING` is fine: it returns the session unchanged, which
-is useful for reopening the meeting link. For online and hybrid workshops the frontend opens `meetingLink` after a
-successful start.
+lets the organizer reopen the live room. For online and hybrid workshops the frontend then opens the live room
+(`/sessions/:id/live`); for in-person workshops it only marks the session Ongoing.
 
 **Access:** Manager (owner or admin)
 
@@ -1593,7 +1591,8 @@ Errors: `400` your own account · `404` · `409` the user still organizes worksh
 
 ### Pages the backend's QR codes point to
 
-The backend builds these URLs from `FRONTEND_URL`, so the frontend **must** implement these routes:
+The backend builds these URLs from `FRONTEND_URL`, so the frontend **must** implement these routes (the live room is
+`/sessions/:id/live`):
 
 | Frontend route                             | What it must do                                                                 |
 | ------------------------------------------ | ------------------------------------------------------------------------------- |
@@ -1618,6 +1617,14 @@ The backend builds these URLs from `FRONTEND_URL`, so the frontend **must** impl
 | Issue certificates            | organizer   | `POST /workshops/:id/certificates/generate`                 |
 | Download certificate          | participant | `GET /my-certificates`, then `GET /certificates/:id/download` |
 | Verify                        | public      | `/verify/:certificateId` page, then `GET /certificates/verify/:certificateId` |
+| Run an online session         | organizer   | `POST /sessions/:id/start`, then `/sessions/:id/live` → `POST /sessions/:id/video/join` |
+| Join + prove presence         | participant | `POST /sessions/:id/video/join`, then `POST /sessions/:id/heartbeat` every interval |
+| Give feedback                 | participant | `GET /my-feedback/pending`, `GET`/`POST /sessions/:id/feedback` |
+| Feedback results + questions  | organizer   | `GET /workshops/:id/feedback`, `PUT /workshops/:id/feedback/questions` |
+| Participants to Excel         | organizer   | `GET /workshops/:id/registrations/export` |
+| Analytics (+ filters)         | admin       | `GET /admin/analytics?workshopId=&year=&month=`, PDF: `GET /admin/analytics/report?…` |
+| People to Excel               | admin       | `GET /admin/users/export?role=PARTICIPANT\|ORGANIZER` |
+| Tamil                         | anyone      | `GET /i18n/ta`, missing text: `POST /i18n/ta/translate` |
 
 ### Testing on phones
 
