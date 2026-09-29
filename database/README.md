@@ -2,17 +2,21 @@
 
 PostgreSQL 14+. Owned by the backend developer.
 
-| File         | Purpose                                                    |
-| ------------ | ---------------------------------------------------------- |
-| `schema.sql` | Drops and recreates all tables, constraints and triggers   |
-| `seed.sql`   | Demo users, workshops, form fields, registrations, sessions, attendance, announcements |
+| File | Purpose |
+| ---- | ------- |
+| `schema.sql` | Drops and recreates all tables, constraints and triggers (fresh setups only) |
+| `migrations/` | Additive, repeatable changes for databases that already hold data (e.g. Supabase) |
+| `seed.sql` | Base demo data: 9 accounts, 4 workshops, form fields, registrations, sessions, attendance, feedback, announcements |
+| `demo_data.sql` | ~15 months of realistic activity on top of the seed (see below) |
+| `sample_feedback.sql` | Optional: the seed's sample feedback, for a database created before migration 005 |
 
 ## Setup
 
 Set the `PG*` values in `server/.env`, then from the repo root:
 
 ```bash
-npm run db:reset             # creates the database if missing, applies schema.sql + seed.sql
+npm run db:reset              # creates the database if missing, applies schema + seed + demo data
+npm run db:reset -- --no-demo  # schema + seed only
 npm run db:reset -- --no-seed  # schema only
 ```
 
@@ -27,6 +31,7 @@ If you prefer `psql`:
 createdb -U postgres aurex26
 psql -U postgres -d aurex26 -f database/schema.sql
 psql -U postgres -d aurex26 -f database/seed.sql
+psql -U postgres -d aurex26 -f database/demo_data.sql
 ```
 
 ## Migrations (databases that already hold data)
@@ -85,10 +90,11 @@ All dates are relative to the day you run the seed, so the demo always looks cur
 | ------------------------------------------ | --------- | ------- | ----------------------------- | --------------------------------------- |
 | Full-Stack Web Development with React & Node.js | CLOSED | HYBRID | 10, all in the past, attendance recorded | Generate certificates: 2 eligible, 2 not |
 | Machine Learning Fundamentals with Python  | PUBLISHED | OFFLINE | 4; the first is **today**     | Start attendance and scan the QR live   |
-| Cybersecurity Essentials                   | PUBLISHED | ONLINE  | 2, upcoming                   | Meeting link hidden until registered    |
+| Cybersecurity Essentials                   | PUBLISHED | ONLINE  | 2, upcoming                   | Runs in the live room (presence demo)   |
 | Cloud & DevOps Bootcamp                    | DRAFT     | OFFLINE | none                          | Visible only to Arjun and the admin     |
 
-No certificates are seeded; generate them live during the demo.
+The base seed issues no certificates, so they can be generated live for Full-Stack. `demo_data.sql` adds 12 more
+workshops (10 finished) with 153 certificates already issued; its accounts are listed in `DEMO_ACCOUNTS.md`.
 
 ## Tables
 
@@ -98,15 +104,25 @@ No certificates are seeded; generate them live during the demo.
 | `workshops`           | Details, dates, mode, venue, meeting link, capacity, `status` (`DRAFT`/`PUBLISHED`/`CLOSED`), `created_by` |
 | `registration_fields` | Per-workshop form fields (`field_name`, `field_type`, `required`, `field_order`, `options`) |
 | `registrations`       | Participant ↔ workshop, answers in `form_data` (JSONB), `UNIQUE(workshop_id, participant_id)` |
-| `sessions`            | Date and time, meeting link, and the current `attendance_token` / `attendance_code` / expiry |
-| `attendance`          | `PRESENT`/`ABSENT` per session and participant, `method` (`QR`/`CODE`/`MANUAL`), `UNIQUE(session_id, participant_id)` |
+| `sessions`            | Date and time, optional backup meeting link, `started_at`, the current `attendance_token` / `attendance_code` / expiry, and the live room name |
+| `attendance`          | `PRESENT`/`ABSENT` per session and participant, `method` (`QR`/`CODE`/`MANUAL`/`PRESENCE`), `UNIQUE(session_id, participant_id)` |
+| `session_watch_logs`  | Verified live-room watch time (seconds) per participant per session |
+| `feedback_questions`  | Per-workshop feedback statements; `is_active = false` when retired |
+| `session_feedback`    | One response per participant per session, optional comment |
+| `feedback_answers`    | Rating 1–5 per statement in a response |
 | `certificates`        | `certificate_id` (public, unique), `verification_token`, attendance % at issue time |
 | `announcements`       | Workshop announcements                                                   |
+| `organizer_requests`  | Organizer access requests (pending / approved / rejected) with the chosen password hash |
+| `blocked_emails`      | Emails of deleted suspended accounts, refused at sign-up |
 
 The attendance percentage is **not stored**. The API calculates it from `sessions` and `attendance` on every request
 (`server/src/services/attendance.service.js`).
 
 ## Changing the schema
 
-Edit `schema.sql` (and `seed.sql` if needed), then run `npm run db:reset`. If the change affects API
-responses, update `docs/API.md` in the same commit. There are no migrations; for a 24-hour build, resetting is simpler.
+1. Add a new file to `migrations/` (next number), written so it can run twice safely (`IF NOT EXISTS`, `ON CONFLICT`).
+2. Make the same change in `schema.sql`, so fresh setups match.
+3. Update `seed.sql` / `demo_data.sql` if they insert into the changed tables.
+4. If API responses change, update `docs/API.md` in the same commit.
+
+Apply it locally with `npm run db:migrate` (or `db:reset`); on Supabase, run the migration in the SQL editor.
