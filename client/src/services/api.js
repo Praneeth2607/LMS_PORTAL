@@ -1,7 +1,9 @@
 // Thin fetch wrapper shared by all feature services.
 // Every API response follows { success, message?, data?, errors? }; see docs/API.md.
 
-const BASE_URL = `${import.meta.env.VITE_API_BASE_URL || ''}/api`;
+// Trailing slashes are dropped: "https://api.example.com/" would otherwise give
+// "//api", which hosts like Vercel redirect without CORS headers.
+const BASE_URL = `${(import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')}/api`;
 const TOKEN_KEY = 'aurex26_token';
 const AUTH_NOTICE_KEY = 'aurex26_auth_notice';
 
